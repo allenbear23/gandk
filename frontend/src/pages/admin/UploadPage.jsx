@@ -40,6 +40,13 @@ export default function UploadPage() {
       alert("請填寫完整資訊並選擇檔案");
       return;
     }
+
+    // 檢查檔案大小 (Vercel Free 限制約 4.5MB)
+    const MAX_SIZE = 4.5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      alert(`檔案太大了 (${(file.size / 1024 / 1024).toFixed(1)}MB)！\nVercel 免費版限制上傳需小於 4.5MB。\n請嘗試壓縮 PDF 或切分成較小的檔案。`);
+      return;
+    }
     
     setUploading(true);
     try {

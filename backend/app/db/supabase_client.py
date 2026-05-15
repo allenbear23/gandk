@@ -137,7 +137,10 @@ async def upload_pdf_to_storage(
     sb.storage.from_(settings.supabase_storage_bucket).upload(
         path=storage_path,
         file=file_bytes,
-        file_options={"content-type": "application/pdf"},
+        file_options={
+            "content-type": "application/pdf",
+            "x-upsert": "true" # Supabase Python SDK 的 upsert 語法
+        },
     )
     logger.info(f"✅ PDF 上傳成功: {storage_path}")
     return storage_path
