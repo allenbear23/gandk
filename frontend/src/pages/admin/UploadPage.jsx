@@ -50,13 +50,12 @@ export default function UploadPage() {
     
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('subject_id', selectedSubject);
-      if (!isGlobal) formData.append('unit_id', selectedUnitCode);
-      formData.append('document_type', documentType);
-
-      await examAPI.uploadDocument(formData);
+      await examAPI.uploadDocument(
+        file, 
+        selectedSubject, 
+        isGlobal ? null : selectedUnitCode, 
+        documentType
+      );
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       loadDocs();

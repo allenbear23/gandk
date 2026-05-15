@@ -33,11 +33,47 @@ export const examAPI = {
     const res = await api.post(`/admin/subjects/${subjectId}/units`, { name, unit_code: unitCode, description });
     return res.data;
   },
-  // 1. 上傳文件（含超時優化）
-  async uploadDocument(formData) {
-    const res = await api.post('/admin/upload', formData, {
-      timeout: 120000 // 延長到 120 秒
+  // 1. 終極方案：前端直傳 Supabase Storage (完全繞過 Vercel 4.5MB 限制)
+  async uploadDocument(file, subjectId, unitId, documentType) {
+    const bucket = 'exam-pdfs';
+    const fileName = `${Date.now()}_${file.name}`;
+    const filePath = `${subjectId}/${documentType}/${fileName}`;
+    
+    // 從環境變數讀取 (請確保已在 Vercel 設定)
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!SUPABASE_URL || !ANON_KEY) {
+      throw new Error("請先設定 VITE_SUPABASE_URL 與 VITE_SUPABASE_ANON_KEY 環境變數");
+    }
+
+    // Step A: 直接上傳到 Supabase Storage
+    const storageUrl = `${SUPABASE_URL}/storage/v1/object/${bucket}/${filePath}`;
+    const uploadRes = await fetch(storageUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${ANON_KEY}`,
+        'apikey': ANON_KEY,
+        'Content-Type': file.type,
+        'x-upsert': 'true'
+      },
+      body: file
     });
+
+    if (!uploadRes.ok) {
+      const errorData = await uploadRes.json();
+      throw new Error(`Storage 上傳失敗: ${errorData.message || uploadRes.statusText}`);
+    }
+
+    // Step B: 告知後端「檔案上傳好了，請開始解析」
+    const res = await api.post('/admin/upload/notify', {
+      subject_id: subjectId,
+      unit_id: unitId,
+      document_type: documentType,
+      filename: file.name,
+      storage_path: filePath
+    });
+    
     return res.data;
   },
   getDocuments: async (subjectId = '') => {

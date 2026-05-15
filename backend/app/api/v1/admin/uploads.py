@@ -99,6 +99,56 @@ async def _process_pdf_background(
 
 # ── API 端點 ──────────────────────────────────────────────────
 
+@router.post("/upload/notify", summary="前端直傳後的通知端點")
+async def notify_upload(
+    background_tasks: BackgroundTasks,
+    data: dict
+):
+    """
+    當前端直接上傳到 Supabase Storage 後，呼叫此端點啟動解析
+    """
+    subject_id = data.get("subject_id")
+    unit_id = data.get("unit_id")
+    document_type = data.get("document_type")
+    filename = data.get("filename")
+    storage_path = data.get("storage_path")
+
+    db = get_supabase()
+    
+    # 取得單元代碼
+    unit_code = "GLOBAL"
+    if unit_id:
+        unit_res = db.table("units").select("unit_code").eq("id", unit_id).single().execute()
+        unit_code = unit_res.data["unit_code"] if unit_res.data else "GLOBAL"
+
+    # 建立 Supabase documents 記錄
+    document_id = await create_document_record({
+        "subject_id": subject_id,
+        "unit_id": unit_id,
+        "document_type": document_type,
+        "filename": filename,
+        "storage_path": storage_path,
+        "status": DocumentStatus.PENDING,
+    })
+
+    # 下載 PDF 用於解析
+    from app.db.supabase_client import download_pdf_from_storage
+    pdf_bytes = await download_pdf_from_storage(storage_path)
+
+    # 啟動背景解析
+    background_tasks.add_task(
+        _process_pdf_background,
+        document_id=document_id,
+        pdf_bytes=pdf_bytes,
+        subject_id=subject_id,
+        unit_code=unit_code,
+        document_type=document_type,
+        filename=filename,
+    )
+
+    return {"message": "通知成功，開始解析", "document_id": document_id}
+
+
 @router.post("/upload", summary="上傳 PDF 並觸發背景解析")
 async def upload_document(
     background_tasks: BackgroundTasks,
