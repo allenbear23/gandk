@@ -30,7 +30,7 @@ def _get_model():
         settings = get_settings()
         genai.configure(api_key=settings.gemini_api_key)
         _model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
+            model_name="gemini-flash-latest",
             generation_config=genai.GenerationConfig(
                 temperature=0.7,          # 適度創意，不過於隨機
                 top_p=0.9,

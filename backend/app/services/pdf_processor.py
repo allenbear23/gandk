@@ -23,7 +23,7 @@ def ocr_pdf_with_gemini(pdf_bytes: bytes) -> str:
     """使用 Gemini Flash 辨識掃描檔內容"""
     settings = get_settings()
     genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = genai.GenerativeModel('gemini-flash-latest')
     
     response = model.generate_content([
         "這是一個教材的掃描檔 PDF，請幫我精確地辨識並提取出裡面的所有文字內容，保持原本的閱讀順序。只需回傳文字內容，不需任何額外解釋。",
