@@ -35,38 +35,25 @@ def ocr_pdf_with_gemini(pdf_bytes: bytes) -> str:
 
 def extract_text_from_pdf(pdf_bytes: bytes) -> str:
     """
-    從 PDF bytes 萃取全文純文字。
-    使用 pdfplumber 逐頁萃取，對中文排版相容性較好。
+    強制使用 Gemini 視覺辨識萃取全文。
+    這能解決傳統解析工具對於複雜排版、亂碼或掃描檔支援不佳的問題。
     """
-    full_text_list = []
-
-    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        total_pages = len(pdf.pages)
-        logger.info(f"📄 開始解析 PDF，共 {total_pages} 頁")
-
-        for i, page in enumerate(pdf.pages):
-            try:
-                text = page.extract_text()
-                if text:
-                    full_text_list.append(text.strip())
-            except Exception as e:
-                logger.warning(f"第 {i+1} 頁萃取失敗: {e}")
-                continue
-
-    raw_text = "\n\n".join(full_text_list)
-    
-    # 🕵️ 如果萃取不到文字，啟動 Gemini OCR 補償
-    if not raw_text.strip():
-        logger.info("🔍 偵測到可能為掃描檔，啟動 Gemini 視覺辨識...")
+    logger.info("🎨 啟動 Gemini 視覺解析模式（Full Vision Mode）...")
+    try:
+        full_text = ocr_pdf_with_gemini(pdf_bytes)
+        cleaned = _clean_text(full_text)
+        logger.info(f"✅ Gemini 視覺解析完成，共 {len(cleaned)} 字元")
+        return cleaned
+    except Exception as e:
+        logger.error(f"❌ Gemini 視覺解析失敗: {e}")
+        # 若視覺解析失敗，最後才嘗試傳統方法做保底
+        logger.info("⚠️ 視覺解析失敗，嘗試使用傳統方法保底...")
         try:
-            raw_text = ocr_pdf_with_gemini(pdf_bytes)
-        except Exception as e:
-            logger.error(f"❌ Gemini OCR 辨識失敗: {e}")
-            raw_text = ""
-
-    cleaned = _clean_text(raw_text)
-    logger.info(f"✅ PDF 萃取完成，共 {len(cleaned)} 字元")
-    return cleaned
+            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                text_list = [p.extract_text() or "" for p in pdf.pages]
+                return _clean_text("\n\n".join(text_list))
+        except:
+            return ""
 
 
 def _clean_text(text: str) -> str:
