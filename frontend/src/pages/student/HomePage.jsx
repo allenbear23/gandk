@@ -152,23 +152,34 @@ export default function HomePage() {
                   <Settings2 className="w-5 h-5 mr-2 text-indigo-500" />
                   第二步：選擇範圍 (可複選)
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {units.length === 0 ? (
-                    <p className="text-slate-500 text-sm">此科目尚無單元資料</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {loadingUnits ? (
+                    <div className="col-span-full py-8 flex flex-col items-center justify-center text-slate-400">
+                      <Loader2 className="w-8 h-8 animate-spin mb-2" />
+                      <p className="text-sm">載入範圍中...</p>
+                    </div>
+                  ) : units.length === 0 ? (
+                    <div className="col-span-full py-8 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                      {selectedSubject ? '此科目尚無單元' : '請先選擇上方科目'}
+                    </div>
                   ) : (
-                    units.map(u => (
-                      <div
-                        key={u.id}
-                        onClick={() => toggleUnit(u.unit_code)}
-                        className={`cursor-pointer border rounded-xl p-4 transition-all duration-200 ${
-                          selectedUnits.includes(u.unit_code) 
-                            ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' 
-                            : 'bg-white border-slate-200 hover:border-indigo-300'
+                    units.map(unit => (
+                      <button
+                        key={unit.id}
+                        onClick={() => toggleUnit(unit.unit_code)}
+                        className={`p-4 rounded-xl border-2 transition-all text-left group ${
+                          selectedUnits.includes(unit.unit_code) 
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200 scale-[1.02]' 
+                            : 'bg-white border-slate-100 text-slate-700 hover:border-blue-200 hover:bg-blue-50'
                         }`}
                       >
-                        <div className="font-semibold text-slate-800">{u.unit_code}</div>
-                        <div className="text-sm text-slate-500 mt-1">{u.name}</div>
-                      </div>
+                        <div className={`text-xs font-bold mb-1 ${selectedUnits.includes(unit.unit_code) ? 'text-blue-100' : 'text-blue-500'}`}>
+                          單元 {unit.unit_code}
+                        </div>
+                        <div className="font-bold text-sm leading-tight line-clamp-2">
+                          {unit.name}
+                        </div>
+                      </button>
                     ))
                   )}
                 </div>
@@ -256,6 +267,24 @@ export default function HomePage() {
         </div>
         
       </div>
+
+      {/* Full Screen Loading Overlay */}
+      {loading && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 text-center">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in duration-300">
+            <div className="relative mx-auto w-20 h-20 mb-6">
+              <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+              <Zap className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 text-blue-600 animate-pulse" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">AI 正在出題中</h3>
+            <p className="text-slate-500 text-sm leading-relaxed">
+              正在掃描教材並結合考古題風格...<br/>
+              請耐心等候約 5-10 秒
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

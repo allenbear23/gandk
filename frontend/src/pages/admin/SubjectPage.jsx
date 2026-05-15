@@ -13,6 +13,9 @@ export default function SubjectPage() {
   const [newSubject, setNewSubject] = useState('');
   const [newUnitCode, setNewUnitCode] = useState('');
   const [newUnitName, setNewUnitName] = useState('');
+  
+  const [isCreatingSubject, setIsCreatingSubject] = useState(false);
+  const [isCreatingUnit, setIsCreatingUnit] = useState(false);
 
   const loadSubjects = () => {
     examAPI.getSubjects().then(data => setSubjects(data.subjects)).catch(console.error);
@@ -33,18 +36,22 @@ export default function SubjectPage() {
   const handleCreateSubject = async (e) => {
     e.preventDefault();
     if (!newSubject) return;
+    setIsCreatingSubject(true);
     try {
       await examAPI.createSubject(newSubject);
       setNewSubject('');
       loadSubjects();
     } catch (err) {
       alert('建立科目失敗');
+    } finally {
+      setIsCreatingSubject(false);
     }
   };
 
   const handleCreateUnit = async (e) => {
     e.preventDefault();
     if (!newUnitCode || !newUnitName || !selectedSubject) return;
+    setIsCreatingUnit(true);
     try {
       await examAPI.createUnit(selectedSubject.id, newUnitName, newUnitCode);
       setNewUnitCode('');
@@ -54,6 +61,8 @@ export default function SubjectPage() {
       setUnits(data.units);
     } catch (err) {
       alert('建立單元失敗');
+    } finally {
+      setIsCreatingUnit(false);
     }
   };
 
@@ -98,8 +107,12 @@ export default function SubjectPage() {
               onChange={e => setNewSubject(e.target.value)}
               className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
             />
-            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center">
-              <Plus className="w-4 h-4" />
+            <button 
+              type="submit" 
+              disabled={isCreatingSubject}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center disabled:bg-slate-400"
+            >
+              {isCreatingSubject ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             </button>
           </form>
 

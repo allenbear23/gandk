@@ -7,6 +7,22 @@ export default function QuizPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const examData = location.state?.examData;
+  const loading = location.state?.loading;
+
+  if (loading) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center space-y-6 text-center">
+        <div className="relative">
+          <div className="w-20 h-20 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+          <Zap className="w-8 h-8 text-blue-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold text-slate-800">AI 正在為您出題</h2>
+          <p className="text-slate-500 animate-pulse">正在從教材與考古題中檢索知識點...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!examData || !examData.questions) {
     return (
