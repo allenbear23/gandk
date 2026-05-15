@@ -38,15 +38,26 @@ logger = logging.getLogger(__name__)
 
 async def _process_pdf_background(
     document_id: str,
-    pdf_bytes: bytes,
+    pdf_bytes: Optional[bytes],
     subject_id: str,
     unit_code: str,
     document_type: str,
     filename: str,
+    storage_path: Optional[str] = None
 ):
     """PDF → 萃取 → Chunk → Embedding → pgvector"""
     try:
         logger.info(f"🔄 開始背景解析 document_id={document_id}")
+        
+        # 如果沒有 bytes，就從 Storage 下載
+        if not pdf_bytes and storage_path:
+            logger.info(f"  📥 正在從 Storage 下載: {storage_path}")
+            from app.db.supabase_client import download_pdf_from_storage
+            pdf_bytes = await download_pdf_from_storage(storage_path)
+
+        if not pdf_bytes:
+            raise ValueError("找不到 PDF 檔案內容")
+
         await update_document_status(document_id, DocumentStatus.PROCESSING)
 
         # Step 1: 萃取文字
@@ -131,19 +142,16 @@ async def notify_upload(
         "status": DocumentStatus.PENDING,
     })
 
-    # 下載 PDF 用於解析
-    from app.db.supabase_client import download_pdf_from_storage
-    pdf_bytes = await download_pdf_from_storage(storage_path)
-
-    # 啟動背景解析
+    # 啟動背景解析 (現在連下載也搬到背景處理)
     background_tasks.add_task(
         _process_pdf_background,
         document_id=document_id,
-        pdf_bytes=pdf_bytes,
+        pdf_bytes=None, # 改由背景下載
         subject_id=subject_id,
         unit_code=unit_code,
         document_type=document_type,
         filename=filename,
+        storage_path=storage_path # 傳入路徑
     )
 
     return {"message": "通知成功，開始解析", "document_id": document_id}
