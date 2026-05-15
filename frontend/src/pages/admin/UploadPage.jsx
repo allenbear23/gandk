@@ -9,7 +9,7 @@ export default function UploadPage() {
   
   // Form state
   const [selectedSubject, setSelectedSubject] = useState('');
-  const [selectedUnitCode, setSelectedUnitCode] = useState('');
+  const [selectedUnitId, setSelectedUnitId] = useState('');
   const [documentType, setDocumentType] = useState('textbook');
   const [isGlobal, setIsGlobal] = useState(false); // 補上遺漏的 state
   const [file, setFile] = useState(null);
@@ -53,7 +53,7 @@ export default function UploadPage() {
       await examAPI.uploadDocument(
         file, 
         selectedSubject, 
-        isGlobal ? null : selectedUnitCode, 
+        isGlobal ? null : selectedUnitId, 
         documentType
       );
       setFile(null);
@@ -82,7 +82,7 @@ export default function UploadPage() {
               <label className="block text-sm font-bold text-slate-700 mb-1">科目</label>
               <select 
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
-                value={selectedSubject} onChange={e => { setSelectedSubject(e.target.value); setSelectedUnitCode(''); }} required
+                value={selectedSubject} onChange={e => { setSelectedSubject(e.target.value); setSelectedUnitId(''); }} required
               >
                 <option value="">選擇科目</option>
                 {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -117,11 +117,11 @@ export default function UploadPage() {
                 <label className="block text-sm font-bold text-slate-700 mb-1">對應單元</label>
                 <select 
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
-                  value={selectedUnitCode} onChange={e => setSelectedUnitCode(e.target.value)} required
+                  value={selectedUnitId} onChange={e => setSelectedUnitId(e.target.value)} required
                   disabled={!selectedSubject}
                 >
                   <option value="">選擇單元</option>
-                  {units.map(u => <option key={u.id} value={u.unit_code}>{u.unit_code} - {u.name}</option>)}
+                  {units.map(u => <option key={u.id} value={u.id}>{u.unit_code} - {u.name}</option>)}
                 </select>
               </div>
             )}
