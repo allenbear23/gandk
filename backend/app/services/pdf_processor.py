@@ -12,10 +12,25 @@ import pdfplumber
 import io
 import re
 import logging
+import google.generativeai as genai
 from typing import List
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+
+def ocr_pdf_with_gemini(pdf_bytes: bytes) -> str:
+    """使用 Gemini Flash 辨識掃描檔內容"""
+    settings = get_settings()
+    genai.configure(api_key=settings.gemini_api_key)
+    model = genai.GenerativeModel('gemini-2.0-flash')
+    
+    response = model.generate_content([
+        "這是一個教材的掃描檔 PDF，請幫我精確地辨識並提取出裡面的所有文字內容，保持原本的閱讀順序。只需回傳文字內容，不需任何額外解釋。",
+        {"mime_type": "application/pdf", "data": pdf_bytes}
+    ])
+    
+    return response.text
 
 
 def extract_text_from_pdf(pdf_bytes: bytes) -> str:
@@ -23,7 +38,7 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
     從 PDF bytes 萃取全文純文字。
     使用 pdfplumber 逐頁萃取，對中文排版相容性較好。
     """
-    full_text = []
+    full_text_list = []
 
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         total_pages = len(pdf.pages)
@@ -33,12 +48,22 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
             try:
                 text = page.extract_text()
                 if text:
-                    full_text.append(text.strip())
+                    full_text_list.append(text.strip())
             except Exception as e:
                 logger.warning(f"第 {i+1} 頁萃取失敗: {e}")
                 continue
 
-    raw_text = "\n\n".join(full_text)
+    raw_text = "\n\n".join(full_text_list)
+    
+    # 🕵️ 如果萃取不到文字，啟動 Gemini OCR 補償
+    if not raw_text.strip():
+        logger.info("🔍 偵測到可能為掃描檔，啟動 Gemini 視覺辨識...")
+        try:
+            raw_text = ocr_pdf_with_gemini(pdf_bytes)
+        except Exception as e:
+            logger.error(f"❌ Gemini OCR 辨識失敗: {e}")
+            raw_text = ""
+
     cleaned = _clean_text(raw_text)
     logger.info(f"✅ PDF 萃取完成，共 {len(cleaned)} 字元")
     return cleaned
