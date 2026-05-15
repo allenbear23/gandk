@@ -110,21 +110,22 @@ export default function HomePage() {
         <div className="relative text-center space-y-2">
           <button 
             onClick={() => navigate('/admin')}
-            className="absolute right-0 top-0 text-slate-400 hover:text-blue-500 text-sm font-medium transition-colors"
+            className="absolute right-0 -top-6 text-slate-400 hover:text-blue-500 text-xs font-medium transition-colors sm:static sm:mb-2"
           >
             進入後台管理 →
           </button>
-          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
             AI 智慧模擬考卷生成系統
           </h1>
-          <p className="text-lg text-slate-600">
+          <p className="text-base sm:text-lg text-slate-600">
             針對範圍精準打擊，10秒產出專屬試題
           </p>
         </div>
 
         {/* Main Card */}
         <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-          <div className="p-8 space-y-8">
+          <div className="p-6 sm:p-8 space-y-8">
+
             
             {/* Step 1: Subject */}
             <div className="space-y-4">

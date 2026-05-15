@@ -133,9 +133,9 @@ export default function QuizPage() {
                     key={choice.key}
                     onClick={() => handleSelect(choice.key)}
                     disabled={isAnswered}
-                    className={`w-full text-left p-5 rounded-2xl border-2 transition-all duration-200 flex items-center group relative overflow-hidden ${stateClass}`}
+                    className={`w-full text-left p-4 sm:p-5 rounded-xl sm:rounded-2xl border-2 transition-all duration-200 flex items-center group relative overflow-hidden active:scale-[0.99] ${stateClass}`}
                   >
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm mr-4 transition-colors
+                    <div className={`flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center font-bold text-xs sm:text-sm mr-3 sm:mr-4 transition-colors
                       ${isAnswered && isCorrectAns ? 'bg-green-500 text-white' : 
                         isAnswered && isSelected ? 'bg-red-500 text-white' :
                         'bg-slate-100 text-slate-600 group-hover:bg-blue-200'}
@@ -143,16 +143,16 @@ export default function QuizPage() {
                       {choice.key}
                     </div>
                     
-                    <span className={`text-lg flex-1 ${isAnswered && (isCorrectAns || isSelected) ? 'font-medium' : ''}`}>
+                    <span className={`text-base sm:text-lg flex-1 ${isAnswered && (isCorrectAns || isSelected) ? 'font-medium' : ''}`}>
                       {choice.text}
                     </span>
 
                     {/* Result Icon */}
                     {isAnswered && isCorrectAns && (
-                      <CheckCircle2 className="w-6 h-6 text-green-500 absolute right-5" />
+                      <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 absolute right-4 sm:right-5" />
                     )}
                     {isAnswered && isSelected && !isCorrectAns && (
-                      <XCircle className="w-6 h-6 text-red-500 absolute right-5" />
+                      <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-500 absolute right-4 sm:right-5" />
                     )}
                   </button>
                 );
