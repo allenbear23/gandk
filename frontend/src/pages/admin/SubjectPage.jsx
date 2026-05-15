@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, BookOpen, Layers } from 'lucide-react';
+import { Plus, BookOpen, Layers, Trash2, Loader2 } from 'lucide-react';
 import { examAPI } from '../../services/api';
 
 export default function SubjectPage() {
   const [subjects, setSubjects] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [units, setUnits] = useState([]);
+  const [isDeleting, setIsDeleting] = useState(null);
+
   
   // Forms
   const [newSubject, setNewSubject] = useState('');
@@ -55,6 +57,22 @@ export default function SubjectPage() {
     }
   };
 
+  const handleDeleteSubject = async (e, subjectId) => {
+    e.stopPropagation(); // 避免點擊垃圾桶時觸發選擇科目
+    if (!window.confirm('確定要刪除此科目嗎？這將會連同底下的單元與文件一併刪除且無法復原。')) return;
+    
+    setIsDeleting(subjectId);
+    try {
+      await examAPI.deleteSubject(subjectId);
+      if (selectedSubject?.id === subjectId) setSelectedSubject(null);
+      loadSubjects();
+    } catch (err) {
+      alert('刪除失敗');
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="mb-8">
@@ -91,11 +109,18 @@ export default function SubjectPage() {
               <div 
                 key={sub.id} 
                 onClick={() => setSelectedSubject(sub)}
-                className={`cursor-pointer p-4 rounded-xl border transition-colors ${
+                className={`group cursor-pointer p-4 rounded-xl border transition-colors flex justify-between items-center ${
                   selectedSubject?.id === sub.id ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400' : 'bg-white border-slate-100 hover:border-slate-300'
                 }`}
               >
                 <div className="font-bold text-slate-800">{sub.name}</div>
+                <button
+                  onClick={(e) => handleDeleteSubject(e, sub.id)}
+                  className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                  disabled={isDeleting === sub.id}
+                >
+                  {isDeleting === sub.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                </button>
               </div>
             ))}
           </div>

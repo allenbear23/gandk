@@ -55,5 +55,9 @@ export const examAPI = {
   getDocumentStatus: async (documentId) => {
     const res = await api.get(`/admin/documents/${documentId}/status`);
     return res.data;
+  },
+  deleteSubject: async (subjectId) => {
+    const res = await api.delete(`/admin/subjects/${subjectId}`);
+    return res.data;
   }
 };
