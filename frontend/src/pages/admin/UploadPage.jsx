@@ -17,6 +17,21 @@ export default function UploadPage() {
   
   const fileInputRef = useRef(null);
 
+  // 1. 先定義函數
+  const loadDocs = async () => {
+    if (!selectedSubject) return;
+    setLoadingDocs(true);
+    try {
+      const data = await examAPI.getDocuments(selectedSubject);
+      setDocuments(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
+  // 2. 再在 useEffect 裡呼叫
   useEffect(() => {
     examAPI.getSubjects().then(data => setSubjects(data.subjects));
   }, []);
@@ -30,19 +45,6 @@ export default function UploadPage() {
       setDocuments([]);
     }
   }, [selectedSubject]);
-
-  const loadDocs = async () => {
-    if (!selectedSubject) return;
-    setLoadingDocs(true);
-    try {
-      const data = await examAPI.getDocuments(selectedSubject);
-      setDocuments(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingDocs(false);
-    }
-  };
 
   const handleUpload = async (e) => {
     if (e) e.preventDefault();
@@ -65,7 +67,7 @@ export default function UploadPage() {
         documentType
       );
       
-      alert("上傳成功！檔案已進入背景解析隊列。");
+      alert("上傳成功！檔案已進入背景解析。");
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       loadDocs();
@@ -93,7 +95,7 @@ export default function UploadPage() {
     <div className="space-y-8">
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-slate-800">教材 PDF 上傳</h2>
-        <p className="text-slate-500 mt-1">上傳課本或考古題 PDF 供 AI 建立知識庫（無檔案大小限制）</p>
+        <p className="text-slate-500 mt-1">上傳課本或考古題 PDF 供 AI 建立知識庫</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -158,7 +160,7 @@ export default function UploadPage() {
                 </select>
               ) : (
                 <div className="p-3 bg-blue-50 text-blue-700 text-xs rounded-lg border border-blue-100 leading-relaxed">
-                  <strong>全域模式：</strong>此文件將作為該科目的通識教材，不歸屬於特定單元。
+                  <strong>全域模式：</strong>此文件將作為該科目的通用教材。
                 </div>
               )}
             </div>
@@ -179,7 +181,7 @@ export default function UploadPage() {
                 {file ? (
                   <div className="text-sm font-medium text-blue-700 truncate px-2">{file.name}</div>
                 ) : (
-                  <div className="text-sm text-slate-500">點擊或拖曳 PDF 至此</div>
+                  <div className="text-sm text-slate-500">點擊選擇 PDF 檔案</div>
                 )}
               </div>
             </div>
@@ -222,7 +224,7 @@ export default function UploadPage() {
                 {loadingDocs ? (
                   <tr><td colSpan="4" className="px-6 py-12 text-center text-slate-400">載入中...</td></tr>
                 ) : documents.length === 0 ? (
-                  <tr><td colSpan="4" className="px-6 py-12 text-center text-slate-400">尚無上傳文件</td></tr>
+                  <tr><td colSpan="4" className="px-6 py-12 text-center text-slate-400">尚無文件</td></tr>
                 ) : documents.map(doc => (
                   <tr key={doc.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
