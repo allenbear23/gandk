@@ -19,6 +19,7 @@ import logging
 
 from app.models.question import DocumentStatus, DocumentType
 from app.db.supabase_client import (
+    get_supabase,
     create_document_record,
     update_document_status,
     get_all_documents,
