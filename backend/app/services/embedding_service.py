@@ -21,8 +21,8 @@ def _get_embedding_model():
     if _embedding_model is None:
         settings = get_settings()
         genai.configure(api_key=settings.gemini_api_key)
-        _embedding_model = "models/text-embedding-004"
-        logger.info("✅ Embedding 模型初始化完成")
+        _embedding_model = "models/gemini-embedding-001"
+        logger.info("✅ Embedding 模型 (gemini-001, 3072維) 初始化完成")
     return _embedding_model
 
 

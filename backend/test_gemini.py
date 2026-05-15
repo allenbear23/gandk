@@ -17,10 +17,21 @@ def test_gemini():
         
         print("📋 可用模型列表：")
         for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                print(f"  - {m.name}")
+            methods = m.supported_generation_methods
+            if 'generateContent' in methods or 'embedContent' in methods:
+                print(f"  - {m.name} (Methods: {methods})")
         
-        # 嘗試使用列表中的 gemini-flash-latest
+        print("\n🧪 測試向量化 (Embedding)...")
+        try:
+            embed_res = genai.embed_content(
+                model="models/gemini-embedding-2",
+                content="測試向量化",
+                task_type="RETRIEVAL_DOCUMENT"
+            )
+            print(f"✅ 向量化成功！(gemini-embedding-2) 維度: {len(embed_res['embedding'])}")
+        except Exception as ee:
+            print(f"❌ 向量化失敗 (gemini-embedding-2): {ee}")
+
         model = genai.GenerativeModel('gemini-flash-latest')
         response = model.generate_content("你好，請跟我說聲『測試成功』")
         
