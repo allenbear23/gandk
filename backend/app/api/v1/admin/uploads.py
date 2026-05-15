@@ -14,6 +14,7 @@ GET  /api/v1/admin/documents/{id}/status → 查詢解析進度
 """
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
 from datetime import datetime, timezone
+from typing import Optional, List
 import logging
 
 from app.models.question import DocumentStatus, DocumentType
