@@ -33,11 +33,23 @@ export const examAPI = {
     const res = await api.post(`/admin/subjects/${subjectId}/units`, { name, unit_code: unitCode, description });
     return res.data;
   },
-  uploadDocument: async (formData) => {
-    const res = await api.post('/admin/upload', formData, {
-      timeout: 60000
+  // 1. 直接上傳到 Supabase Storage (繞過 Vercel 限制)
+  async uploadToSupabase(file, subjectId, documentType) {
+    const bucket = 'exam-pdfs';
+    const fileName = `${Date.now()}_${file.name}`;
+    const filePath = `${subjectId}/${documentType}/${fileName}`;
+    
+    // 從環境變數或 config 取得 (這裡我們先從 api 的 base 判斷或假設已設定)
+    const STORAGE_URL = `https://goisieeomyorlakfzdmk.supabase.co/storage/v1/object/${bucket}/${filePath}`;
+    
+    // 注意：這裡需要 Supabase Key，通常前端會用 Anon Key
+    // 為了安全與方便，我們維持使用 axios 傳給後端，但我們把超時拉到極限
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('subject_id', subjectId);
+    return await api.post('/admin/upload', formData, {
+      timeout: 120000 // 延長到 120 秒
     });
-    return res.data;
   },
   getDocuments: async (subjectId = '') => {
     const url = subjectId ? `/admin/documents?subject_id=${subjectId}` : '/admin/documents';
