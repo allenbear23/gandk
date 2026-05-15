@@ -17,29 +17,52 @@ export default function UploadPage() {
   
   const fileInputRef = useRef(null);
 
-  // 1. 先定義函數
-  const loadDocs = async () => {
-    if (!selectedSubject) return;
+  // 初始化科目列表
+  useEffect(() => {
+    examAPI.getSubjects()
+      .then(data => {
+        setSubjects(Array.isArray(data?.subjects) ? data.subjects : []);
+      })
+      .catch(err => {
+        console.error("載入科目失敗:", err);
+        setSubjects([]);
+      });
+  }, []);
+
+  // 獲取文件列表的函數
+  const loadDocs = async (subjectId) => {
+    if (!subjectId) return;
     setLoadingDocs(true);
     try {
-      const data = await examAPI.getDocuments(selectedSubject);
-      setDocuments(data);
+      const data = await examAPI.getDocuments(subjectId);
+      // 防禦性檢查：確保 documents 是陣列
+      setDocuments(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error(err);
+      console.error("載入文件列表失敗:", err);
+      setDocuments([]);
     } finally {
       setLoadingDocs(false);
     }
   };
 
-  // 2. 再在 useEffect 裡呼叫
-  useEffect(() => {
-    examAPI.getSubjects().then(data => setSubjects(data.subjects));
-  }, []);
-
+  // 當科目改變時，獲取單元和文件
   useEffect(() => {
     if (selectedSubject) {
-      examAPI.getUnits(selectedSubject).then(data => setUnits(data.units));
-      loadDocs();
+      // 1. 獲取單元
+      examAPI.getUnits(selectedSubject)
+        .then(data => {
+          setUnits(Array.isArray(data?.units) ? data.units : []);
+        })
+        .catch(err => {
+          console.error("載入單元失敗:", err);
+          setUnits([]);
+        });
+      
+      // 2. 獲取文件
+      loadDocs(selectedSubject);
+      
+      // 重置單元選擇
+      setSelectedUnitId('');
     } else {
       setUnits([]);
       setDocuments([]);
@@ -67,12 +90,12 @@ export default function UploadPage() {
         documentType
       );
       
-      alert("上傳成功！檔案已進入背景解析。");
+      alert("上傳成功！檔案已進入背景解析隊列。");
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      loadDocs();
+      loadDocs(selectedSubject);
     } catch (err) {
-      console.error("上傳失敗詳細資訊:", err);
+      console.error("上傳失敗:", err);
       const detail = err.response?.data?.detail;
       const errorMsg = typeof detail === 'object' ? JSON.stringify(detail) : detail;
       alert("上傳失敗: " + (errorMsg || err.message));
@@ -85,8 +108,9 @@ export default function UploadPage() {
     if (!window.confirm("確定要刪除此文件及其所有解析數據嗎？")) return;
     try {
       await examAPI.deleteDocument(id);
-      loadDocs();
+      loadDocs(selectedSubject);
     } catch (err) {
+      console.error("刪除失敗:", err);
       alert("刪除失敗");
     }
   };
@@ -100,17 +124,21 @@ export default function UploadPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Upload Form */}
+        {/* 上傳表單 */}
         <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-fit">
           <form onSubmit={handleUpload} className="space-y-5">
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">1. 選擇科目</label>
               <select 
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
-                value={selectedSubject} onChange={e => { setSelectedSubject(e.target.value); setSelectedUnitId(''); }} required
+                value={selectedSubject} 
+                onChange={e => setSelectedSubject(e.target.value)} 
+                required
               >
                 <option value="">選擇科目</option>
-                {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {Array.isArray(subjects) && subjects.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
               </select>
             </div>
 
@@ -152,11 +180,15 @@ export default function UploadPage() {
               {!isGlobal ? (
                 <select 
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
-                  value={selectedUnitId} onChange={e => setSelectedUnitId(e.target.value)} required
+                  value={selectedUnitId} 
+                  onChange={e => setSelectedUnitId(e.target.value)} 
+                  required={!isGlobal}
                   disabled={!selectedSubject}
                 >
                   <option value="">選擇單元</option>
-                  {units.map(u => <option key={u.id} value={u.id}>單元 {u.unit_code}: {u.name}</option>)}
+                  {Array.isArray(units) && units.map(u => (
+                    <option key={u.id} value={u.id}>單元 {u.unit_code}: {u.name}</option>
+                  ))}
                 </select>
               ) : (
                 <div className="p-3 bg-blue-50 text-blue-700 text-xs rounded-lg border border-blue-100 leading-relaxed">
@@ -203,11 +235,11 @@ export default function UploadPage() {
           </form>
         </div>
 
-        {/* Documents List */}
+        {/* 文件列表 */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-slate-700">已上傳文件</h3>
-            <button onClick={loadDocs} className="text-xs text-blue-600 hover:underline">重新整理</button>
+            <button onClick={() => loadDocs(selectedSubject)} className="text-xs text-blue-600 hover:underline">重新整理</button>
           </div>
           
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -223,13 +255,13 @@ export default function UploadPage() {
               <tbody className="divide-y divide-slate-100">
                 {loadingDocs ? (
                   <tr><td colSpan="4" className="px-6 py-12 text-center text-slate-400">載入中...</td></tr>
-                ) : documents.length === 0 ? (
+                ) : !Array.isArray(documents) || documents.length === 0 ? (
                   <tr><td colSpan="4" className="px-6 py-12 text-center text-slate-400">尚無文件</td></tr>
                 ) : documents.map(doc => (
                   <tr key={doc.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="font-medium text-slate-800 truncate max-w-xs">{doc.filename}</div>
-                      <div className="text-[10px] text-slate-400">{new Date(doc.uploaded_at).toLocaleString()}</div>
+                      <div className="text-[10px] text-slate-400">{doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleString() : '未知時間'}</div>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -241,7 +273,7 @@ export default function UploadPage() {
                     <td className="px-6 py-4">
                       {doc.status === 'indexed' ? (
                         <div className="flex items-center text-green-600 font-bold text-xs">
-                          <CheckCircle2 className="w-3 h-3 mr-1" /> 已完成 ({doc.chunk_count} 段)
+                          <CheckCircle2 className="w-3 h-3 mr-1" /> 已完成 ({doc.chunk_count || 0} 段)
                         </div>
                       ) : doc.status === 'processing' ? (
                         <div className="flex items-center text-blue-600 text-xs animate-pulse">

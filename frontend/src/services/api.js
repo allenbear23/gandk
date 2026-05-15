@@ -88,5 +88,9 @@ export const examAPI = {
   deleteSubject: async (subjectId) => {
     const res = await api.delete(`/admin/subjects/${subjectId}`);
     return res.data;
+  },
+  deleteDocument: async (documentId) => {
+    const res = await api.delete(`/admin/documents/${documentId}`);
+    return res.data;
   }
 };
