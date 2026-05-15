@@ -33,17 +33,9 @@ export const examAPI = {
     const res = await api.post(`/admin/subjects/${subjectId}/units`, { name, unit_code: unitCode, description });
     return res.data;
   },
-  uploadDocument: async (file, subjectId, unitCode, documentType) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('subject_id', subjectId);
-    formData.append('unit_code', unitCode);
-    formData.append('document_type', documentType); // 'textbook' or 'past_exam'
-    
+  uploadDocument: async (formData) => {
     const res = await api.post('/admin/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
+      timeout: 60000
     });
     return res.data;
   },
