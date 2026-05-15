@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, FileText, Smartphone, Settings2, Loader2, Download } from 'lucide-react';
+import { BookOpen, FileText, Smartphone, Settings2, Loader2, Download, Zap } from 'lucide-react';
 import { examAPI } from '../../services/api';
 
 export default function HomePage() {
@@ -18,6 +18,7 @@ export default function HomePage() {
   // UI State
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
+  const [loadingUnits, setLoadingUnits] = useState(false);
 
   // Initialize
   useEffect(() => {
@@ -35,12 +36,18 @@ export default function HomePage() {
   // Fetch units when subject changes
   useEffect(() => {
     if (selectedSubject) {
+      setLoadingUnits(true);
       examAPI.getUnits(selectedSubject)
         .then(data => {
           setUnits(data.units);
           setSelectedUnits([]); // Reset units
         })
-        .catch(console.error);
+        .catch(err => {
+          console.error("Failed to load units:", err);
+        })
+        .finally(() => {
+          setLoadingUnits(false);
+        });
     } else {
       setUnits([]);
     }
