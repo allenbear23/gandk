@@ -142,7 +142,7 @@ async def upload_document(
     # 建立 Supabase documents 記錄
     document_id = await create_document_record({
         "subject_id": subject_id,
-        "unit_code": unit_code,
+        "unit_id": unit_id, # 修正為 unit_id
         "document_type": document_type,
         "filename": file.filename,
         "storage_path": storage_path,
