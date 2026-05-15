@@ -130,20 +130,28 @@ async def upload_pdf_to_storage(
     """
     settings = get_settings()
     sb = get_supabase()
-
     unique_id = uuid.uuid4().hex[:8]
     storage_path = f"{subject_id}/{document_type}/{unique_id}_{filename}"
 
-    sb.storage.from_(settings.supabase_storage_bucket).upload(
-        path=storage_path,
-        file=file_bytes,
-        file_options={
-            "content-type": "application/pdf",
-            "x-upsert": "true" # Supabase Python SDK 的 upsert 語法
-        },
-    )
-    logger.info(f"✅ PDF 上傳成功: {storage_path}")
-    return storage_path
+    try:
+        # 注意：Supabase Python SDK 的 upsert 是在 file_options 裡的 "upsert" 鍵
+        res = sb.storage.from_(settings.supabase_storage_bucket).upload(
+            path=storage_path,
+            file=file_bytes,
+            file_options={
+                "content-type": "application/pdf",
+                "upsert": "true"
+            },
+        )
+        # 檢查是否回傳了錯誤 (有些版本會回傳錯誤物件而非噴例外)
+        if hasattr(res, 'error') and res.error:
+            raise Exception(f"Supabase Storage 錯誤: {res.error}")
+            
+        logger.info(f"✅ PDF 上傳成功: {storage_path}")
+        return storage_path
+    except Exception as e:
+        logger.error(f"❌ Storage 上傳失敗: {str(e)}")
+        raise Exception(f"無法存取 Storage (請確認 bucket 'exam-pdfs' 是否已建立): {str(e)}")
 
 
 async def download_pdf_from_storage(storage_path: str) -> bytes:
