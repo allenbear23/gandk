@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS units (
 CREATE TABLE IF NOT EXISTS documents (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     subject_id    UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-    unit_code     TEXT NOT NULL,
+    unit_id       UUID REFERENCES units(id) ON DELETE CASCADE,
     document_type TEXT NOT NULL CHECK (document_type IN ('textbook', 'past_exam')),
     filename      TEXT NOT NULL,
     storage_path  TEXT NOT NULL,

@@ -99,17 +99,30 @@ async def _process_pdf_background(
 # ── API 端點 ──────────────────────────────────────────────────
 
 @router.post("/upload", summary="上傳 PDF 並觸發背景解析")
-async def upload_pdf(
+async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     subject_id: str = Form(...),
-    unit_code: str = Form(...),
-    document_type: str = Form(...),
+    unit_id: Optional[str] = Form(None),
+    document_type: str = Form("textbook")
 ):
+    """
+    上傳教材或考古題 PDF 並啟動非同步處理
+    """
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "僅支援 PDF 格式")
     if document_type not in [t.value for t in DocumentType]:
         raise HTTPException(400, f"document_type 必須為 {[t.value for t in DocumentType]}")
+
+    db = get_supabase()
+    
+    # 取得科目名稱與單元代碼
+    unit_code = "GLOBAL"
+    if unit_id:
+        unit_res = db.table("units").select("unit_code").eq("id", unit_id).single().execute()
+        if not unit_res.data:
+            raise HTTPException(status_code=404, detail="Unit not found")
+        unit_code = unit_res.data["unit_code"]
 
     pdf_bytes = await file.read()
     if not pdf_bytes:

@@ -53,7 +53,7 @@ async def retrieve_context(
     past_exam_task = search_similar_chunks(
         query_embedding=query_embedding,
         subject_id=subject_id,
-        unit_codes=unit_codes,
+        unit_codes=unit_codes + ["GLOBAL"],
         document_type="past_exam",
         top_k=top_k // 2,  # 考古題取少一點，主要參考風格
     )
