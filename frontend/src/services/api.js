@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// 可以透過環境變數設定 API_URL，本地預設使用 8000
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+// 使用相對路徑，透過 Vercel Rewrites 代理請求，徹底解決 CORS 問題
+const API_BASE_URL = '/api/v1';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
