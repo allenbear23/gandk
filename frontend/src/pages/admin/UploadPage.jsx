@@ -11,6 +11,7 @@ export default function UploadPage() {
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedUnitCode, setSelectedUnitCode] = useState('');
   const [documentType, setDocumentType] = useState('textbook');
+  const [isGlobal, setIsGlobal] = useState(false); // 補上遺漏的 state
   const [file, setFile] = useState(null);
   
   const [uploading, setUploading] = useState(false);
