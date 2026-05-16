@@ -92,5 +92,9 @@ export const examAPI = {
   deleteDocument: async (documentId) => {
     const res = await api.delete(`/admin/documents/${documentId}`);
     return res.data;
+  },
+  analyzeStyle: async (subjectId, documentId) => {
+    const res = await api.post(`/admin/subjects/${subjectId}/analyze-style-from-doc/${documentId}`);
+    return res.data;
   }
 };
