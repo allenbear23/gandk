@@ -9,8 +9,8 @@ from app.utils.json_validator import extract_and_validate_json
 
 logger = logging.getLogger(__name__)
 
-# 使用 1.5-flash 因為它在免費額度內是最穩定的
-MODEL_NAME = "models/gemini-1.5-flash"
+# 使用 lite 版本以避開免費層配額限制
+MODEL_NAME = "models/gemini-2.0-flash-lite"
 
 async def generate_questions(
     system_prompt: str,
