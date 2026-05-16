@@ -19,28 +19,27 @@ async def generate_exam(req: ExamGenerateRequest):
         subject_name = await get_subject_name(req.subject_id)
         style_prompt = await get_subject_style(req.subject_id)
         
-        # 1. RAG 檢索 (恢復檢索，僅取最關鍵片段)
+        # 1. RAG 檢索 (正式恢復)
+        logger.info(f"🔍 檢索教材中: {subject_name}")
         context = await retrieve_context(
             subject_id=req.subject_id,
             unit_codes=req.unit_codes,
             subject_name=subject_name,
-            top_k=5,
+            top_k=8,
         )
 
-        # 2. 組裝 Prompt (測試期：強制 3 題)
-        test_count = 3
+        # 2. 組裝 Prompt
         system_prompt, user_prompt = build_exam_prompt(
             subject_name=subject_name,
             unit_codes=req.unit_codes,
-            question_count=test_count,
-            textbook_chunks=[],
-            past_exam_chunks=[],
+            question_count=req.question_count,
+            textbook_chunks=context["textbook_chunks"],
+            past_exam_chunks=context["past_exam_chunks"],
             difficulty=req.difficulty or 3,
             style_prompt=style_prompt
         )
 
         # 3. 呼叫 Gemini AI
-        logger.info(f"🚀 AI 開始命題 (預計題數: {req.question_count})...")
         res_data = await generate_questions(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -53,32 +52,33 @@ async def generate_exam(req: ExamGenerateRequest):
             questions = res_data
 
         if not questions:
-            raise ValueError("AI 沒有產生任何題目，請檢查教材是否已正確解析。")
+            raise ValueError("AI 沒有產生題目，請檢查 API Key 或教材內容。")
 
-        # 4. 建立結果物件
+        # 4. 建立結果
         exam_result = ExamResult(
             subject=subject_name,
             subject_id=req.subject_id,
             units=req.unit_codes,
             total_questions=len(questions),
             questions=questions,
-            generated_at=datetime.now(timezone.utc),
-            metadata=res_data.get("metadata", {})
+            generated_at=datetime.now(timezone.utc)
         )
 
-        # 5. 回應模式 (測試期：暫停 Word 生成以排查環境崩潰)
+        # 5. 回應模式 (正式恢復 Word 匯出)
         if req.mode == GenerationMode.PRINT:
-            # from app.services.word_exporter import export_to_docx
-            # docx_bytes = export_to_docx(exam_result)
-            return {
-                "message": "測試期間 Word 生成暫停，請使用『開始測驗』模式查看題目。",
-                "questions": questions
-            }
+            from app.services.word_exporter import export_to_docx
+            docx_bytes = export_to_docx(exam_result)
+            return Response(
+                content=docx_bytes,
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                headers={
+                    "Content-Disposition": "attachment; filename=exam_results.docx"
+                }
+            )
         else:
             return exam_result
 
     except Exception as e:
         error_detail = traceback.format_exc()
-        logger.error(f"❌ 嚴重錯誤:\n{error_detail}")
-        # 將完整的 Traceback 回傳給前端，方便我們診斷
-        raise HTTPException(status_code=500, detail=f"後端崩潰訊息：\n{error_detail}")
+        logger.error(f"❌ 錯誤: {error_detail}")
+        raise HTTPException(status_code=500, detail=f"生成失敗：\n{error_detail}")
