@@ -19,22 +19,22 @@ async def generate_exam(req: ExamGenerateRequest):
         subject_name = await get_subject_name(req.subject_id)
         style_prompt = await get_subject_style(req.subject_id)
         
-        # 1. RAG 檢索
-        logger.info(f"🔍 正在檢索教材內容... 科目: {subject_name}")
-        context = await retrieve_context(
-            subject_id=req.subject_id,
-            unit_codes=req.unit_codes,
-            subject_name=subject_name,
-            top_k=10, # 稍微增加檢索量
-        )
+        # 1. RAG 檢索 (暫時停用以測試速度)
+        # context = await retrieve_context(
+        #     subject_id=req.subject_id,
+        #     unit_codes=req.unit_codes,
+        #     subject_name=subject_name,
+        #     top_k=5,
+        # )
+        context = {"textbook_chunks": [], "past_exam_chunks": []}
 
         # 2. 組裝 Prompt
         system_prompt, user_prompt = build_exam_prompt(
             subject_name=subject_name,
             unit_codes=req.unit_codes,
             question_count=req.question_count,
-            textbook_chunks=context["textbook_chunks"],
-            past_exam_chunks=context["past_exam_chunks"],
+            textbook_chunks=[],
+            past_exam_chunks=[],
             difficulty=req.difficulty or 3,
             style_prompt=style_prompt
         )
