@@ -1,26 +1,27 @@
 from fastapi import APIRouter
 import os
-import google.generativeai as genai
+from app.db.supabase_client import get_supabase
 
 router = APIRouter(prefix="/health", tags=["Health Check"])
 
 @router.get("/")
 async def health_check():
+    # 檢查 Gemini
     api_key = os.getenv("GEMINI_API_KEY", "MISSING")
-    api_key_masked = f"{api_key[:5]}***{api_key[-5:]}" if len(api_key) > 10 else "INVALID"
     
-    status = "OK"
+    # 檢查 Supabase
+    supabase_status = "Unknown"
     try:
-        genai.configure(api_key=api_key)
-        # 簡單測試模型是否可用
-        model = genai.GenerativeModel("gemini-flash-latest")
-        status = "Gemini Connected"
+        sb = get_supabase()
+        # 測試抓取一個科目
+        res = sb.table("subjects").select("count", count="exact").limit(1).execute()
+        supabase_status = f"Connected (Count: {res.count})"
     except Exception as e:
-        status = f"Gemini Error: {str(e)}"
+        supabase_status = f"Supabase Error: {str(e)}"
 
     return {
-        "status": status,
-        "api_key_status": "FOUND" if api_key != "MISSING" else "MISSING",
-        "api_key_preview": api_key_masked,
-        "environment": os.getenv("VERCEL_ENV", "local")
+        "gemini_status": "OK" if api_key != "MISSING" else "MISSING",
+        "supabase_status": supabase_status,
+        "environment": os.getenv("VERCEL_ENV", "local"),
+        "python_version": os.getenv("PYTHON_VERSION", "unknown")
     }
