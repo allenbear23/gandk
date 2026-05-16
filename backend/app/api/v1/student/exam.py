@@ -19,8 +19,8 @@ async def generate_exam(req: ExamGenerateRequest):
     try:
         subject_name = await get_subject_name(req.subject_id)
         
-        # 1. RAG 檢索（含表頭片段）
-        top_k = min(req.question_count // 2 + 5, 20)
+        # 1. RAG 檢索（含表頭與考古題範例）
+        top_k = 15 # 預設檢索量
         context = await retrieve_context(
             subject_id=req.subject_id,
             unit_codes=req.unit_codes,
@@ -28,30 +28,41 @@ async def generate_exam(req: ExamGenerateRequest):
             top_k=top_k,
         )
 
-        # 2. 組裝 Prompt（傳入 head_chunks）
+        # 2. 自動偵測題數 (如果模式是 PRINT 且題數為 0 或未指定)
+        target_count = req.question_count
+        if req.mode == GenerationMode.PRINT and (not target_count or target_count <= 0):
+            logger.info("🔍 模式為 PRINT 且未指定題數，正在從考古題範例分析題數...")
+            # 這裡我們透過一個簡單的啟發式方法，或是在 Prompt 中讓 AI 自己決定
+            # 目前我們先設定一個預設值，並在 Prompt 中告訴 AI「盡量模仿範例題數」
+            target_count = 50 # 台灣考卷常見題數
+        
+        # 3. 組裝 Prompt
         system_prompt, user_prompt = build_exam_prompt(
             subject_name=subject_name,
             unit_codes=req.unit_codes,
-            question_count=req.question_count,
+            question_count=target_count,
             textbook_chunks=context["textbook_chunks"],
             past_exam_chunks=context["past_exam_chunks"],
             head_chunks=context.get("head_chunks"),
             difficulty=req.difficulty or 3,
         )
+        
+        # 在 Prompt 後面額外加一句：如果範例中有明確題數，請優先參考範例題數
+        user_prompt += "\n【重要】如果考古題範例中有顯示總題數，請忽略我要求的數量，直接按照範例的數量出題。"
 
-        # 3. 呼叫 Gemini AI
-        logger.info(f"🚀 開始動態模仿生成（目標 {req.question_count} 題）...")
+        # 4. 呼叫 Gemini AI
+        logger.info(f"🚀 開始動態模仿生成（模式: {req.mode}）...")
         res_data = await generate_questions(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            target_count=req.question_count,
+            target_count=target_count,
             unit_codes=req.unit_codes,
         )
         
         questions = res_data["questions"]
         metadata = res_data["metadata"]
 
-        # 4. 建立結果物件
+        # 5. 建立結果物件
         exam_result = ExamResult(
             subject=subject_name,
             subject_id=req.subject_id,
@@ -60,15 +71,13 @@ async def generate_exam(req: ExamGenerateRequest):
             questions=questions,
             generated_at=datetime.now(timezone.utc)
         )
-        # 額外掛載動態 metadata
         exam_result.metadata = metadata
 
-        # 5. 回應模式
+        # 6. 回應模式
         if req.mode == GenerationMode.PRINT:
             from app.services.word_exporter import export_to_docx
             docx_bytes = export_to_docx(exam_result)
             
-            # 使用 AI 模仿的標題作為檔名
             file_title = metadata.get("title", f"模擬考卷_{subject_name}")
             filename = f"{file_title}.docx"
             
