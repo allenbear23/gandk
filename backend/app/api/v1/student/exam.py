@@ -19,19 +19,20 @@ async def generate_exam(req: ExamGenerateRequest):
     try:
         subject_name = await get_subject_name(req.subject_id)
         
-        # 1. RAG 檢索
+        # 1. RAG 檢索 (減少檢索量以拼速度)
         context = await retrieve_context(
             subject_id=req.subject_id,
             unit_codes=req.unit_codes,
             subject_name=subject_name,
-            top_k=20,
+            top_k=8,
         )
 
-        # 2. 組裝 Prompt
+        # 2. 強制 5 題測試
+        test_count = 5
         system_prompt, user_prompt = build_exam_prompt(
             subject_name=subject_name,
             unit_codes=req.unit_codes,
-            question_count=req.question_count,
+            question_count=test_count,
             textbook_chunks=context["textbook_chunks"],
             past_exam_chunks=context["past_exam_chunks"],
             difficulty=req.difficulty or 3,
