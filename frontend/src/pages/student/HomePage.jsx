@@ -24,7 +24,7 @@ export default function HomePage() {
   useEffect(() => {
     examAPI.getSubjects()
       .then(data => {
-        setSubjects(data.subjects);
+        setSubjects(data?.subjects || []);
         setFetchingData(false);
       })
       .catch(err => {
@@ -39,7 +39,7 @@ export default function HomePage() {
       setLoadingUnits(true);
       examAPI.getUnits(selectedSubject)
         .then(data => {
-          setUnits(data.units);
+          setUnits(data?.units || []);
           setSelectedUnits([]); // Reset units
         })
         .catch(err => {
@@ -148,7 +148,7 @@ export default function HomePage() {
                 onChange={(e) => setSelectedSubject(e.target.value)}
               >
                 <option value="">-- 請選擇科目 --</option>
-                {subjects.map(s => (
+                {(subjects || []).map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
@@ -172,7 +172,7 @@ export default function HomePage() {
                       {selectedSubject ? '此科目尚無單元' : '請先選擇上方科目'}
                     </div>
                   ) : (
-                    units.map(unit => (
+                    (units || []).map(unit => (
                       <button
                         key={unit.id}
                         onClick={() => toggleUnit(unit.unit_code)}
