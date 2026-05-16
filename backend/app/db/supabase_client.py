@@ -55,12 +55,14 @@ async def get_subject_name(subject_id: str) -> str:
 
 
 async def get_subject_style(subject_id: str) -> Optional[str]:
-    """獲取科目的自定義風格提示詞"""
+    """獲取科目的自定義風格提示詞 (具備欄位不存在的容錯)"""
     sb = get_supabase()
     try:
+        # 如果欄位還沒建立，這裡會噴錯
         res = sb.table("subjects").select("style_prompt").eq("id", subject_id).single().execute()
         return res.data.get("style_prompt") if res.data else None
-    except:
+    except Exception as e:
+        logger.warning(f"⚠️ 無法讀取 style_prompt (可能欄位尚未建立): {e}")
         return None
 
 
@@ -112,12 +114,21 @@ async def update_document_status(doc_id: str, status: str, extra: dict = None):
 
 async def get_all_documents(subject_id: str = None) -> list[dict]:
     sb = get_supabase()
-    # 使用 *, units(*) 進行關聯查詢，抓取單元的 unit_code 和 name
-    query = sb.table("documents").select("*, units(*)").order("uploaded_at", desc=True)
-    if subject_id:
-        query = query.eq("subject_id", subject_id)
-    res = query.execute()
-    return res.data
+    try:
+        # 嘗試進行關聯查詢
+        query = sb.table("documents").select("*, units(unit_code, name)").order("uploaded_at", desc=True)
+        if subject_id:
+            query = query.eq("subject_id", subject_id)
+        res = query.execute()
+        return res.data if res.data else []
+    except Exception as e:
+        logger.warning(f"⚠️ 關聯查詢失敗，改用單表查詢: {e}")
+        # 如果關聯查詢失敗（例如 Foreign Key 未設），則回退到單表查詢
+        query = sb.table("documents").select("*").order("uploaded_at", desc=True)
+        if subject_id:
+            query = query.eq("subject_id", subject_id)
+        res = query.execute()
+        return res.data if res.data else []
 
 
 async def get_document_by_id(doc_id: str) -> Optional[dict]:
