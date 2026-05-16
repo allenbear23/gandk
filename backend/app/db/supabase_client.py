@@ -102,10 +102,12 @@ async def update_document_status(doc_id: str, status: str, extra: dict = None):
 
 async def get_all_documents(subject_id: str = None) -> list[dict]:
     sb = get_supabase()
-    query = sb.table("documents").select("*").order("uploaded_at", desc=True)
+    # 使用 *, units(*) 進行關聯查詢，抓取單元的 unit_code 和 name
+    query = sb.table("documents").select("*, units(*)").order("uploaded_at", desc=True)
     if subject_id:
         query = query.eq("subject_id", subject_id)
-    return query.execute().data
+    res = query.execute()
+    return res.data
 
 
 async def get_document_by_id(doc_id: str) -> Optional[dict]:
