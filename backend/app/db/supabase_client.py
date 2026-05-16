@@ -251,11 +251,12 @@ async def search_similar_chunks(
     """
     sb = get_supabase()
     try:
+        logger.info(f"🔎 執行 RPC search_chunks: subject={subject_id}, type={document_type}, units={unit_codes}")
         res = sb.rpc(
             "search_chunks",
             {
                 "query_embedding": query_embedding,
-                "p_subject_id": subject_id,
+                "p_subject_id": str(subject_id), # 強制轉換為字串
                 "p_unit_codes": unit_codes,
                 "p_document_type": document_type,
                 "p_top_k": top_k,
@@ -263,5 +264,5 @@ async def search_similar_chunks(
         ).execute()
         return res.data or []
     except Exception as e:
-        logger.warning(f"pgvector search 失敗: {e}")
+        logger.warning(f"⚠️ pgvector RPC search 失敗 (可能是函數不存在或類型錯誤): {e}")
         return []
