@@ -4,12 +4,10 @@ from typing import List, Optional
 from app.db.supabase_client import get_supabase
 from app.services.ai_generator import _call_gemini_sync
 
-# 注意：這裡的 prefix 要跟前端 api.js 匹配
 router = APIRouter(prefix="/admin/subjects", tags=["Admin - 科目管理"])
 logger = logging.getLogger(__name__)
 
-@router.get("", summary="取得所有科目")
-@router.get("/", summary="取得所有科目 (含斜線)")
+@router.get("/", summary="取得所有科目")
 async def get_subjects():
     try:
         sb = get_supabase()
@@ -32,6 +30,7 @@ async def get_units(subject_id: str):
 @router.post("/{subject_id}/analyze-style-from-doc/{document_id}")
 async def analyze_style_from_doc(subject_id: str, document_id: str):
     sb = get_supabase()
+    # 抓取片段
     chunks_res = sb.table("document_chunks").select("chunk_text").eq("document_id", document_id).limit(10).execute()
     if not chunks_res.data:
         raise HTTPException(status_code=404, detail="找不到文件內容")
@@ -45,6 +44,7 @@ async def analyze_style_from_doc(subject_id: str, document_id: str):
 """
     try:
         style_prompt = _call_gemini_sync("你是一位專業教育文件分析師。", analysis_prompt)
+        # 更新資料庫
         sb.table("subjects").update({"style_prompt": style_prompt}).eq("id", subject_id).execute()
         return {"status": "success", "style_prompt": style_prompt}
     except Exception as e:
