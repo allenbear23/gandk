@@ -52,7 +52,7 @@ async def generate_questions(
     user_prompt: str,
     target_count: int,
     unit_codes: List[str],
-    max_retries: int = 2,
+    max_retries: int = 1,
 ) -> dict:
     loop = asyncio.get_event_loop()
     all_questions = []
@@ -62,7 +62,7 @@ async def generate_questions(
     # 確保即使 target_count 是 0 (自動偵測模式)，也會至少執行一次分析
     while (len(all_questions) < target_count or attempt == 0) and attempt <= max_retries:
         # 如果是自動偵測模式 (0)，我們期望 AI 第一次就產出題目，所以設定一個較大的剩餘量
-        remaining = target_count - len(all_questions) if target_count > 0 else 50
+        remaining = target_count - len(all_questions) if target_count > 0 else 15
         current_user_prompt = user_prompt
         if attempt > 0:
             current_user_prompt += f"\n\n【補充】請再生成 {remaining} 題，維持同樣風格。"

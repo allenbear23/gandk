@@ -32,9 +32,8 @@ async def generate_exam(req: ExamGenerateRequest):
         target_count = req.question_count
         if req.mode == GenerationMode.PRINT and (not target_count or target_count <= 0):
             logger.info("🔍 模式為 PRINT 且未指定題數，正在從考古題範例分析題數...")
-            # 這裡我們透過一個簡單的啟發式方法，或是在 Prompt 中讓 AI 自己決定
-            # 目前我們先設定一個預設值，並在 Prompt 中告訴 AI「盡量模仿範例題數」
-            target_count = 50 # 台灣考卷常見題數
+            # 暫時下調為 15 題，避免 Vercel 10秒超時
+            target_count = 15 
         
         # 3. 組裝 Prompt
         system_prompt, user_prompt = build_exam_prompt(
