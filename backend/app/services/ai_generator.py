@@ -40,11 +40,9 @@ def _get_model():
 )
 def _call_gemini_sync(system_prompt: str, user_prompt: str) -> str:
     model = _get_model()
-    response = model.generate_content([
-        {"role": "user", "parts": [system_prompt]},
-        {"role": "model", "parts": ["我明白了，我會先分析考古題排版，然後嚴格按照 JSON 格式輸出內容。"]},
-        {"role": "user", "parts": [user_prompt]},
-    ])
+    # 使用更簡潔的單次 Prompt 模式，確保在 Vercel 上的穩定性
+    full_prompt = f"{system_prompt}\n\n請根據以下要求執行任務：\n{user_prompt}"
+    response = model.generate_content(full_prompt)
     return response.text
 
 async def generate_questions(
