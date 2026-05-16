@@ -66,17 +66,14 @@ async def generate_exam(req: ExamGenerateRequest):
             metadata=res_data.get("metadata", {})
         )
 
-        # 5. 回應模式
+        # 5. 回應模式 (測試期：暫停 Word 生成以排查環境崩潰)
         if req.mode == GenerationMode.PRINT:
-            from app.services.word_exporter import export_to_docx
-            docx_bytes = export_to_docx(exam_result)
-            return Response(
-                content=docx_bytes,
-                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                headers={
-                    "Content-Disposition": "attachment; filename=exam_results.docx"
-                }
-            )
+            # from app.services.word_exporter import export_to_docx
+            # docx_bytes = export_to_docx(exam_result)
+            return {
+                "message": "測試期間 Word 生成暫停，請使用『開始測驗』模式查看題目。",
+                "questions": questions
+            }
         else:
             return exam_result
 
