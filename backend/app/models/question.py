@@ -54,7 +54,6 @@ class ExamResult(BaseModel):
     total_questions: int
     questions: List[Question]
     generated_at: datetime = Field(default_factory=datetime.now)
-    metadata: Optional[dict] = None
 
 
 # ── 生成請求 ──────────────────────────────────────────────────
@@ -62,7 +61,7 @@ class ExamResult(BaseModel):
 class ExamGenerateRequest(BaseModel):
     subject_id: str
     unit_codes: List[str] = Field(..., min_length=1)
-    question_count: int = Field(default=20, ge=0, le=50)
+    question_count: int = Field(default=20, ge=5, le=50)
     mode: GenerationMode = GenerationMode.QUIZ
     difficulty: Optional[int] = Field(default=None, ge=1, le=5)
 

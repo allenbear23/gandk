@@ -43,7 +43,6 @@ async def retrieve_context(
 
     # 並行搜尋兩個來源
     import asyncio
-    from app.db.supabase_client import search_similar_chunks, get_document_head_chunks
     textbook_task = search_similar_chunks(
         query_embedding=query_embedding,
         subject_id=subject_id,
@@ -56,17 +55,11 @@ async def retrieve_context(
         subject_id=subject_id,
         unit_codes=unit_codes + ["GLOBAL"],
         document_type="past_exam",
-        top_k=top_k // 2,
-    )
-    # 新增：獲取考古題表頭片段，用於分析排版基因
-    head_task = get_document_head_chunks(
-        subject_id=subject_id,
-        document_type="past_exam",
-        limit=3
+        top_k=top_k // 2,  # 考古題取少一點，主要參考風格
     )
 
-    textbook_chunks, past_exam_chunks, head_chunks = await asyncio.gather(
-        textbook_task, past_exam_task, head_task
+    textbook_chunks, past_exam_chunks = await asyncio.gather(
+        textbook_task, past_exam_task
     )
 
     logger.info(
@@ -77,7 +70,6 @@ async def retrieve_context(
     return {
         "textbook_chunks": textbook_chunks,
         "past_exam_chunks": past_exam_chunks,
-        "head_chunks": head_chunks,
         "has_textbook": len(textbook_chunks) > 0,
-        "has_past_exam": (len(past_exam_chunks) + len(head_chunks)) > 0,
+        "has_past_exam": len(past_exam_chunks) > 0,
     }

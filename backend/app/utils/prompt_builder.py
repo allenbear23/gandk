@@ -1,4 +1,13 @@
+"""
+utils/prompt_builder.py — System Prompt 組裝工具
+
+設計原則：
+- 嚴格要求 JSON 輸出（防止 AI 自由發揮格式）
+- 明確指定「參考課本，不超綱」+ 「模仿考古題風格」
+- 內建 JSON Schema 讓 AI 照格式輸出
+"""
 from typing import List
+
 
 def build_exam_prompt(
     subject_name: str,
@@ -6,70 +15,74 @@ def build_exam_prompt(
     question_count: int,
     textbook_chunks: List[dict],
     past_exam_chunks: List[dict],
-    head_chunks: List[dict] = None,
     difficulty: int = 3,
 ) -> tuple[str, str]:
     """
-    動態排版與人設模仿 Prompt 構建器。
+    組裝 System Prompt + User Prompt。
+    回傳 (system_prompt, user_prompt)。
     """
-    textbook_context = _format_chunks(textbook_chunks, "課本核心知識")
-    past_exam_context = _format_chunks(past_exam_chunks, "考古題題目風格參考")
-    head_context = _format_chunks(head_chunks or [], "考古題排版與表頭範例")
+    # ── 整理知識庫內容 ──────────────────────────────────────────
+    textbook_context = _format_chunks(textbook_chunks, "課本知識")
+    past_exam_context = _format_chunks(past_exam_chunks, "考古題範例")
 
     units_str = "、".join(unit_codes)
     difficulty_desc = {1: "簡單", 2: "中易", 3: "中等", 4: "中難", 5: "困難"}[difficulty]
 
-    system_prompt = f"""你是一位具備高度模仿能力的專業教育命題專家。
-你的任務是根據提供的【考古題排版與表頭範例】，「自動提取」其排版特徵與命題人設，並產出一份風格完全一致的新考卷。
+    # ── System Prompt ──────────────────────────────────────────
+    system_prompt = f"""你是一位專業的台灣高中{subject_name}科出題老師，擅長設計符合課綱的選擇題。
 
-## 第一步：排版與人設分析（動態模仿）
-請仔細閱讀【考古題排版與表頭範例】，分析並模仿以下內容：
-1. **考卷抬頭**：包含年份、學期、考試名稱、科目名稱的寫法。
-2. **資訊欄位**：包含班級、座號、姓名、分數格的排列順序與文字。
-3. **命題人設**：分析其命題語氣（例如：是嚴肅的學術風、還是親切的引導風）。
-4. **配分邏輯**：觀察其題目如何標註分數（例如：每題 2 分、或 2.5 分）。
+## 你的任務
+根據提供的「課本知識」與「考古題範例」，出 {question_count} 題{subject_name}選擇題。
 
-## 第二步：命題規範
-1. **知識點**：嚴格遵守【課本核心知識】，範圍限定在「{units_str}」。
-2. **題型**：模仿考古題的題幹長度、史料使用比例。
-3. **難度**：設定為「{difficulty_desc}」。
+## 嚴格規則
+1. **知識範圍**：所有題目必須完全基於「課本知識」中的內容，絕對不可超出給定的單元範圍（{units_str}）。
+2. **題型風格**：模仿「考古題範例」的出題方式、語氣與難易度層次。
+3. **難度要求**：整體難度為「{difficulty_desc}」（1-5 級中的 {difficulty} 級）。
+4. **選項設計**：四個選項（A/B/C/D）需有明顯區別，且干擾選項須合理（不能明顯離題）。
+5. **解析品質**：explanation 必須明確說明正確答案的依據，並點出其他選項的錯誤之處。
+6. **輸出格式**：只能輸出 JSON，不得有任何額外說明文字、markdown 代碼塊或前言。
 
-## 輸出格式 (JSON)
-你必須輸出以下結構的 JSON：
+## 輸出 JSON Schema（嚴格遵守）
 {{
-  "exam_metadata": {{
-    "title": "（模仿範例產出的完整標題，如：112學年度第一學期...）",
-    "header_fields": ["班級", "座號", "姓名"],
-    "score_info": "（模仿範例的計分說明，如：共 50 題，每題 2 分）",
-    "persona_style": "（簡述你模仿的風格類型）"
-  }},
   "questions": [
     {{
       "id": 1,
-      "question": "題目內容",
+      "question": "題目文字（可含史料、引文等）",
       "choices": [
-        {{"key": "A", "text": "選項"}},
-        {{"key": "B", "text": "選項"}},
-        {{"key": "C", "text": "選項"}},
-        {{"key": "D", "text": "選項"}}
+        {{"key": "A", "text": "選項A文字"}},
+        {{"key": "B", "text": "選項B文字"}},
+        {{"key": "C", "text": "選項C文字"}},
+        {{"key": "D", "text": "選項D文字"}}
       ],
-      "answer": "A",
-      "explanation": "【解析】依據課本...，故選A。"
+      "answer": "B",
+      "explanation": "詳細解析，說明為何選B，以及A、C、D錯誤的原因",
+      "unit_code": "{units_str.split('、')[0]}",
+      "difficulty": {difficulty}
     }}
   ]
 }}"""
 
-    user_prompt = f"""請開始分析並出題。
-{head_context}
+    # ── User Prompt ────────────────────────────────────────────
+    user_prompt = f"""請根據以下資料，出 {question_count} 題{subject_name}選擇題（範圍：{units_str}）。
+
 {textbook_context}
+
 {past_exam_context}
-"""
+
+請直接輸出 JSON，不要任何其他文字。"""
+
     return system_prompt, user_prompt
 
+
 def _format_chunks(chunks: List[dict], label: str) -> str:
-    if not chunks: return f"【{label}】\n（無相關資料）\n"
+    """將 chunks list 格式化為 prompt 中的段落"""
+    if not chunks:
+        return f"【{label}】\n（無相關資料）\n"
+
     content = f"【{label}】\n"
     for i, chunk in enumerate(chunks, 1):
+        unit = chunk.get("unit_code", "")
         text = chunk.get("chunk_text", chunk.get("text", ""))
-        content += f"\n[參考片段 {i}]\n{text}\n"
+        content += f"\n[片段 {i}｜單元 {unit}]\n{text}\n"
+
     return content
