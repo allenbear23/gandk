@@ -70,12 +70,11 @@ async def generate_exam(req: ExamGenerateRequest):
         if req.mode == GenerationMode.PRINT:
             from app.services.word_exporter import export_to_docx
             docx_bytes = export_to_docx(exam_result)
-            filename = f"模擬考卷_{subject_name}.docx"
             return Response(
                 content=docx_bytes,
                 media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 headers={
-                    "Content-Disposition": f'attachment; filename="{filename.encode("utf8").decode("latin1")}"'
+                    "Content-Disposition": "attachment; filename=exam_results.docx"
                 }
             )
         else:
