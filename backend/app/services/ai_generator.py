@@ -9,8 +9,8 @@ from app.utils.json_validator import extract_and_validate_json
 
 logger = logging.getLogger(__name__)
 
-# 使用 lite 版本以避開免費層配額限制
-MODEL_NAME = "models/gemini-2.0-flash-lite"
+# 使用最新的 2.5-flash
+MODEL_NAME = "models/gemini-2.5-flash"
 
 async def generate_questions(
     system_prompt: str,
