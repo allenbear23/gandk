@@ -3,10 +3,14 @@ import logging
 from typing import List, Optional
 from pydantic import BaseModel
 from app.db.supabase_client import get_supabase
-from app.services.ai_generator import _call_gemini_sync
+from app.services.ai_generator import _call_gemini_sync, list_available_models
 
 router = APIRouter(prefix="/admin/subjects", tags=["Admin - 科目管理"])
 logger = logging.getLogger(__name__)
+
+@router.get("/debug-models", summary="診斷：列出可用模型")
+async def debug_models():
+    return await list_available_models()
 
 # 定義請求模型
 class SubjectCreate(BaseModel):
