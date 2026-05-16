@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// 使用相對路徑，透過 Vercel Rewrites 代理請求，徹底解決 CORS 問題
-const API_BASE_URL = '/api/v1';
+// 如果環境變數中有設定 API URL (Railway 用)，就直接使用；否則使用相對路徑 (Vercel 用)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
