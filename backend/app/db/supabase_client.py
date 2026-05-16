@@ -123,9 +123,17 @@ async def delete_document(doc_id: str):
     logger.info(f"🗑️ 已從資料庫刪除文件: {doc_id}")
 
 
-# ══════════════════════════════════════════════════
-#  Storage — PDF 上傳/下載
-# ══════════════════════════════════════════════════
+async def get_document_head_chunks(subject_id: str, document_type: str, limit: int = 3) -> list[dict]:
+    """獲取該科目下最新一份文件的開頭片段（通常包含表頭與排版）"""
+    sb = get_supabase()
+    # 先找最新的一份文件
+    doc_res = sb.table("documents").select("id").eq("subject_id", subject_id).eq("document_type", document_type).order("uploaded_at", desc=True).limit(1).execute()
+    if not doc_res.data:
+        return []
+    doc_id = doc_res.data[0]["id"]
+    # 抓取該文件的開頭片段
+    chunks_res = sb.table("document_chunks").select("*").eq("document_id", doc_id).order("chunk_index").limit(limit).execute()
+    return chunks_res.data
 
 async def upload_pdf_to_storage(
     file_bytes: bytes,
