@@ -114,6 +114,13 @@ async def get_document_by_id(doc_id: str) -> Optional[dict]:
     return res.data
 
 
+async def delete_document(doc_id: str):
+    """刪除文件紀錄（級聯刪除會自動清理 chunks）"""
+    sb = get_supabase()
+    sb.table("documents").delete().eq("id", doc_id).execute()
+    logger.info(f"🗑️ 已從資料庫刪除文件: {doc_id}")
+
+
 # ══════════════════════════════════════════════════
 #  Storage — PDF 上傳/下載
 # ══════════════════════════════════════════════════

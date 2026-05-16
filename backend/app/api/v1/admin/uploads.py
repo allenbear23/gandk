@@ -258,3 +258,10 @@ async def get_document_status(document_id: str):
         "error_message": doc.get("error_message"),
         "indexed_at": doc.get("indexed_at"),
     }
+
+
+@router.delete("/documents/{document_id}", summary="刪除文件")
+async def remove_document(document_id: str):
+    from app.db.supabase_client import delete_document
+    await delete_document(document_id)
+    return {"message": "文件已刪除"}
