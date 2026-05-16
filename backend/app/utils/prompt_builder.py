@@ -9,29 +9,29 @@ def build_exam_prompt(
     difficulty: int = 3,
 ) -> tuple[str, str]:
     """
-    組裝專業的台灣高中命題 Prompt。
+    專業台灣高中命題 Prompt - 修正單元代碼缺失問題。
     """
     textbook_context = _format_chunks(textbook_chunks, "課本核心內容")
     past_exam_context = _format_chunks(past_exam_chunks, "考古題風格參考")
 
     units_str = "、".join(unit_codes)
+    first_unit = unit_codes[0] if unit_codes else "1-1"
     difficulty_desc = {1: "簡單", 2: "中易", 3: "中等", 4: "中難", 5: "困難"}[difficulty]
 
-    system_prompt = f"""你是一位擁有 20 年經驗的台灣高中{subject_name}科名師。你正在為一份正式的段考考卷命題。
+    system_prompt = f"""你是一位擁有 20 年經驗的台灣高中{subject_name}科名師。
+請根據提供的素材，出一份正式的、符合高中段考標準的 JSON 格式考卷。
 
-## 命題準則
-1. **正式語氣**：題幹應嚴謹，大量使用「下列敘述何者正確？」、「根據上文，...」等標準命題語句。
-2. **素材融入**：盡可能將引文、史料或情境融入題幹中。
-3. **選項設計**：四個選項 (A,B,C,D) 必須長度相近，且具備合理的干擾性。
-4. **內容守備**：嚴格遵守提供之【課本核心內容】，不得超出高中「{units_str}」單元的教學範圍。
+## 命題與格式規範
+1. **語氣**：使用專業的學術命題風格。
+2. **結構**：必須嚴格遵守以下 JSON 結構，且每一題都必須包含 "unit_code" 欄位。
 
-## 輸出格式 (JSON)
-你必須嚴格依照以下結構輸出：
+## JSON 結構範例
 {{
   "questions": [
     {{
       "id": 1,
-      "question": "題目文字",
+      "unit_code": "{first_unit}",
+      "question": "題目文字...",
       "choices": [
         {{"key": "A", "text": "選項內容"}},
         {{"key": "B", "text": "選項內容"}},
@@ -39,12 +39,14 @@ def build_exam_prompt(
         {{"key": "D", "text": "選項內容"}}
       ],
       "answer": "A",
-      "explanation": "【解析】說明正確原因與錯誤選項之處。"
+      "explanation": "【解析】..."
     }}
   ]
 }}"""
 
-    user_prompt = f"""請出 {question_count} 題{subject_name}選擇題。難度：{difficulty_desc}。
+    user_prompt = f"""請產出 {question_count} 題{subject_name}選擇題。
+範圍：{units_str}
+難度：{difficulty_desc}
 
 {textbook_context}
 {past_exam_context}
