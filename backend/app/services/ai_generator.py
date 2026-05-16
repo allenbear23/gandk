@@ -9,8 +9,8 @@ from app.utils.json_validator import extract_and_validate_json
 
 logger = logging.getLogger(__name__)
 
-# 使用你清單中最標準的穩定型號
-MODEL_NAME = "models/gemini-flash-latest"
+# 使用你清單中的型號
+MODEL_NAME = "models/gemini-2.0-flash"
 
 async def generate_questions(
     system_prompt: str,
