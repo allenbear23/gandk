@@ -95,7 +95,9 @@ export default function HomePage() {
       }
     } catch (err) {
       console.error(err);
-      alert("生成失敗，請檢查後端是否正常運作。");
+      // 提取後端回傳的具體錯誤訊息
+      const errorMsg = err.response?.data?.detail || err.message || "發生未知錯誤";
+      alert(`生成失敗！詳細原因：\n${errorMsg}`);
     } finally {
       setLoading(false);
     }
