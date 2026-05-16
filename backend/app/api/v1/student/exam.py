@@ -17,7 +17,9 @@ logger = logging.getLogger(__name__)
 @router.post("/generate", summary="生成考卷")
 async def generate_exam(req: ExamGenerateRequest):
     try:
+        from app.db.supabase_client import get_subject_name, get_subject_style
         subject_name = await get_subject_name(req.subject_id)
+        style_prompt = await get_subject_style(req.subject_id)
         
         # 1. RAG 檢索 (減少檢索量以拼速度)
         context = await retrieve_context(
@@ -27,15 +29,15 @@ async def generate_exam(req: ExamGenerateRequest):
             top_k=8,
         )
 
-        # 2. 強制 5 題測試
-        test_count = 5
+        # 2. 組裝 Prompt
         system_prompt, user_prompt = build_exam_prompt(
             subject_name=subject_name,
             unit_codes=req.unit_codes,
-            question_count=test_count,
+            question_count=req.question_count,
             textbook_chunks=context["textbook_chunks"],
             past_exam_chunks=context["past_exam_chunks"],
             difficulty=req.difficulty or 3,
+            style_prompt=style_prompt, # 新增參數
         )
 
         # 3. 呼叫 Gemini AI

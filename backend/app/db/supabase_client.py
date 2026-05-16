@@ -51,7 +51,17 @@ async def create_subject(data: dict) -> str:
 async def get_subject_name(subject_id: str) -> str:
     sb = get_supabase()
     res = sb.table("subjects").select("name").eq("id", subject_id).single().execute()
-    return res.data["name"] if res.data else subject_id
+    return res.data["name"] if res.data else "未知科目"
+
+
+async def get_subject_style(subject_id: str) -> Optional[str]:
+    """獲取科目的自定義風格提示詞"""
+    sb = get_supabase()
+    try:
+        res = sb.table("subjects").select("style_prompt").eq("id", subject_id).single().execute()
+        return res.data.get("style_prompt") if res.data else None
+    except:
+        return None
 
 
 async def delete_subject(subject_id: str):
