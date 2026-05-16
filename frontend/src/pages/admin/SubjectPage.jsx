@@ -18,7 +18,7 @@ export default function SubjectPage() {
   const [isCreatingUnit, setIsCreatingUnit] = useState(false);
 
   const loadSubjects = () => {
-    examAPI.getSubjects().then(data => setSubjects(data.subjects)).catch(console.error);
+    examAPI.getSubjects().then(data => setSubjects(data?.subjects || [])).catch(console.error);
   };
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export default function SubjectPage() {
 
   useEffect(() => {
     if (selectedSubject) {
-      examAPI.getUnits(selectedSubject.id).then(data => setUnits(data.units)).catch(console.error);
+      examAPI.getUnits(selectedSubject.id).then(data => setUnits(data?.units || [])).catch(console.error);
     } else {
       setUnits([]);
     }
@@ -58,7 +58,7 @@ export default function SubjectPage() {
       setNewUnitName('');
       // Reload units
       const data = await examAPI.getUnits(selectedSubject.id);
-      setUnits(data.units);
+      setUnits(data?.units || []);
     } catch (err) {
       alert('建立單元失敗');
     } finally {
@@ -117,8 +117,8 @@ export default function SubjectPage() {
           </form>
 
           <div className="space-y-2">
-            {subjects.length === 0 && <p className="text-slate-400 text-center py-4">尚無科目，請先建立</p>}
-            {subjects.map(sub => (
+            {(subjects || []).length === 0 && <p className="text-slate-400 text-center py-4">尚無科目，請先建立</p>}
+            {(subjects || []).map(sub => (
               <div 
                 key={sub.id} 
                 onClick={() => setSelectedSubject(sub)}
@@ -176,8 +176,8 @@ export default function SubjectPage() {
               </form>
 
               <div className="space-y-2">
-                {units.length === 0 && <p className="text-slate-400 text-center py-4">尚無單元</p>}
-                {units.map(u => (
+                {(units || []).length === 0 && <p className="text-slate-400 text-center py-4">尚無單元</p>}
+                {(units || []).map(u => (
                   <div key={u.id} className="p-3 rounded-lg bg-slate-50 border border-slate-100 flex items-center">
                     <span className="font-bold text-indigo-600 mr-3 min-w-[3rem]">{u.unit_code}</span>
                     <span className="text-slate-700">{u.name}</span>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, CheckCircle2, XCircle, Brain, ArrowLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle2, XCircle, Brain, ArrowLeft, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function QuizPage() {
@@ -40,7 +40,7 @@ export default function QuizPage() {
   const [userAnswers, setUserAnswers] = useState({});
   const [showExplanation, setShowExplanation] = useState({});
 
-  const currentQ = questions[currentIndex];
+  const currentQ = questions[currentIndex] || { question: '', choices: [], answer: '', explanation: '' };
   const isAnswered = !!userAnswers[currentIndex];
   const isCorrect = userAnswers[currentIndex] === currentQ.answer;
 
@@ -64,7 +64,7 @@ export default function QuizPage() {
 
   // Calculate Progress
   const answeredCount = Object.keys(userAnswers).length;
-  const correctCount = Object.values(userAnswers).filter((ans, idx) => ans === questions[idx].answer).length;
+  const correctCount = Object.entries(userAnswers).filter(([idx, ans]) => ans === questions[idx]?.answer).length;
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -82,7 +82,7 @@ export default function QuizPage() {
           
           <div className="flex flex-col items-center">
             <span className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-1">
-              {examData.subject} • {examData.units.join(', ')}
+              {examData.subject} • {(examData.units || []).join(', ')}
             </span>
             <div className="text-sm font-semibold text-slate-800">
               {currentIndex + 1} / {questions.length}
@@ -98,7 +98,7 @@ export default function QuizPage() {
         <div className="h-1 bg-slate-200">
           <div 
             className="h-full bg-blue-500 transition-all duration-300"
-            style={{ width: `${(answeredCount / questions.length) * 100}%` }}
+            style={{ width: `${(answeredCount / (questions?.length || 1)) * 100}%` }}
           />
         </div>
       </div>

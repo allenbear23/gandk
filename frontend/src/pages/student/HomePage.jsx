@@ -167,7 +167,7 @@ export default function HomePage() {
                       <Loader2 className="w-8 h-8 animate-spin mb-2" />
                       <p className="text-sm">載入範圍中...</p>
                     </div>
-                  ) : units.length === 0 ? (
+                  ) : (units || []).length === 0 ? (
                     <div className="col-span-full py-8 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
                       {selectedSubject ? '此科目尚無單元' : '請先選擇上方科目'}
                     </div>
