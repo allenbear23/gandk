@@ -59,8 +59,10 @@ async def generate_questions(
     exam_metadata = {}
     attempt = 0
 
-    while len(all_questions) < target_count and attempt <= max_retries:
-        remaining = target_count - len(all_questions)
+    # 確保即使 target_count 是 0 (自動偵測模式)，也會至少執行一次分析
+    while (len(all_questions) < target_count or attempt == 0) and attempt <= max_retries:
+        # 如果是自動偵測模式 (0)，我們期望 AI 第一次就產出題目，所以設定一個較大的剩餘量
+        remaining = target_count - len(all_questions) if target_count > 0 else 50
         current_user_prompt = user_prompt
         if attempt > 0:
             current_user_prompt += f"\n\n【補充】請再生成 {remaining} 題，維持同樣風格。"
