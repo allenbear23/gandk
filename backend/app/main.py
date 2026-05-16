@@ -68,7 +68,9 @@ app.include_router(subjects_router, prefix=API_PREFIX)
 app.include_router(uploads_router, prefix=API_PREFIX)
 
 from app.api.v1.student.exam import router as exam_router
+from app.api.v1.health import router as health_diag_router
 app.include_router(exam_router, prefix=API_PREFIX)
+app.include_router(health_diag_router, prefix=API_PREFIX)
 
 
 @app.get("/health", tags=["系統"])
