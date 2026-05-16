@@ -39,14 +39,28 @@ export default function UploadPage() {
     setErrorInfo('');
     try {
       console.log(`🔍 正在抓取科目 [${subjectId}] 的文件列表...`);
-      const data = await examAPI.getDocuments(subjectId);
-      console.log("📥 API 回傳原始數據:", data);
+      const resData = await examAPI.getDocuments(subjectId);
+      console.log("📥 API 回傳原始數據:", resData);
       
-      const list = Array.isArray(data) ? data : [];
+      // 相容多種格式：可能是 [doc1, doc2] 或 { documents: [...] } 或 { data: [...] }
+      let list = [];
+      if (Array.isArray(resData)) {
+        list = resData;
+      } else if (resData && Array.isArray(resData.documents)) {
+        list = resData.documents;
+      } else if (resData && Array.isArray(resData.data)) {
+        list = resData.data;
+      } else if (resData && typeof resData === 'object') {
+        console.warn("⚠️ 收到非預期的物件格式，嘗試提取所有值...");
+        // 如果都不是，看看是不是單一物件誤傳
+        list = Object.values(resData).find(v => Array.isArray(v)) || [];
+      }
+      
+      console.log("📊 處理後的列表:", list);
       setDocuments(list);
       
       if (list.length === 0) {
-        console.warn("⚠️ 該科目下無文件記錄");
+        console.warn("⚠️ 最終清單為空，請確認資料庫中是否有對應資料");
       }
     } catch (err) {
       console.error("❌ 載入文件列表失敗:", err);
