@@ -1,13 +1,15 @@
 import io
 import logging
-from docx import Document
 from app.models.question import ExamResult
 
 logger = logging.getLogger(__name__)
 
 def export_to_docx(exam_result: ExamResult) -> bytes:
-    """穩定版匯出器：確保在所有環境下都能生成基本的 Word 檔"""
+    """隔離版匯出器：將引用移至內部，防止啟動時崩潰"""
     try:
+        # 在函式內部引用，避免全域載入失敗
+        from docx import Document
+        
         doc = Document()
         doc.add_heading(f"考試科目：{exam_result.subject}", 0)
         
@@ -15,8 +17,7 @@ def export_to_docx(exam_result: ExamResult) -> bytes:
         doc.add_paragraph(f"總題數：{exam_result.total_questions}")
         
         for i, q in enumerate(exam_result.questions, 1):
-            # 增加安全檢查，防止題目物件屬性缺失
-            q_text = getattr(q, 'question', '（題目載入失敗）')
+            q_text = getattr(q, 'question', '題目內容缺失')
             doc.add_paragraph(f"{i}. {q_text}")
             
             choices = getattr(q, 'choices', [])
@@ -34,6 +35,6 @@ def export_to_docx(exam_result: ExamResult) -> bytes:
         doc.save(file_stream)
         return file_stream.getvalue()
     except Exception as e:
-        logger.error(f"Word 匯出失敗: {e}")
-        # 如果 docx 噴錯，至少回傳一個空的 Bytes 避免崩潰
-        raise ValueError(f"Word 生成失敗，請聯繫管理員。詳細原因: {str(e)}")
+        logger.error(f"❌ Word 匯出器核心崩潰: {e}")
+        # 如果 python-docx 真的跑不起來，回傳一個友善的錯誤訊息
+        raise ImportError(f"伺服器 Word 組件故障 (lxml 衝突)，請聯繫管理員修復。錯誤細節: {str(e)}")
