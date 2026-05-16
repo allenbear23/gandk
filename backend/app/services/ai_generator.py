@@ -8,51 +8,7 @@ from app.utils.json_validator import extract_and_validate_json
 
 logger = logging.getLogger(__name__)
 
-_model = None
-_detected_model_name = None
-
-async def _get_best_model_name():
-    """動態從 API 獲取可用的 Flash 模型名稱"""
-    global _detected_model_name
-    if _detected_model_name:
-        return _detected_model_name
-
-    settings = get_settings()
-    genai.configure(api_key=settings.gemini_api_key)
-    
-    try:
-        # 在執行緒中執行同步的 list_models
-        loop = asyncio.get_event_loop()
-        models = await loop.run_in_executor(None, genai.list_models)
-        
-        # 優先找 1.5 Flash，其次找任何 Flash
-        flash_models = [m.name for m in models if "flash" in m.name.lower()]
-        
-        if flash_models:
-            # 優先選擇 1.5 版本
-            v15 = [m for m in flash_models if "1.5" in m]
-            _detected_model_name = v15[0] if v15 else flash_models[0]
-            logger.info(f"✨ 自動偵測到最佳模型: {_detected_model_name}")
-            return _detected_model_name
-    except Exception as e:
-        logger.warning(f"⚠️ 無法透過 API 獲取模型清單: {e}")
-    
-    # 最終保底
-    return "models/gemini-1.5-flash-latest"
-
-async def _get_model():
-    global _model
-    if _model is None:
-        model_name = await _get_best_model_name()
-        _model = genai.GenerativeModel(
-            model_name=model_name,
-            generation_config=genai.GenerationConfig(
-                temperature=0.2,
-                max_output_tokens=2048,
-                response_mime_type="application/json",
-            ),
-        )
-    return _model
+_best_working_model = None
 
 async def generate_questions(
     system_prompt: str,
@@ -61,25 +17,68 @@ async def generate_questions(
     unit_codes: List[str],
     max_retries: int = 0,
 ) -> dict:
-    model = await _get_model()
-    try:
-        response = await model.generate_content_async(
-            f"{system_prompt}\n\n{user_prompt}"
-        )
-        raw_output = response.text
-        data = extract_and_validate_json(raw_output)
-        if isinstance(data, list):
-            return {"questions": data}
-        return data or {"questions": []}
-    except Exception as e:
-        logger.error(f"❌ Gemini 生成失敗: {e}")
-        raise
-
-def _call_gemini_sync(system_prompt: str, user_prompt: str) -> str:
-    """同步呼叫 (用於後台任務，由於 get_model 現在是 async，這裡需特殊處理)"""
-    # 為了簡化，同步任務直接用保底名稱
+    """使用多重保底嘗試法呼叫 Gemini"""
+    global _best_working_model
     settings = get_settings()
     genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+    
+    # 候選名單：按優先順序排列
+    candidate_models = [
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-latest",
+        "models/gemini-1.5-flash",
+        "models/gemini-1.5-flash-latest",
+        "gemini-pro",
+        "models/gemini-pro"
+    ]
+    
+    # 如果已經知道哪個能用，就先插隊到第一名
+    if _best_working_model:
+        candidate_models.insert(0, _best_working_model)
+
+    last_error = None
+    for model_name in candidate_models:
+        try:
+            logger.info(f"🧪 嘗試使用模型: {model_name}...")
+            model = genai.GenerativeModel(
+                model_name=model_name,
+                generation_config=genai.GenerationConfig(
+                    temperature=0.2,
+                    max_output_tokens=2048,
+                    response_mime_type="application/json",
+                ),
+            )
+            
+            # 呼叫 API
+            response = await model.generate_content_async(
+                f"{system_prompt}\n\n{user_prompt}"
+            )
+            
+            raw_output = response.text
+            data = extract_and_validate_json(raw_output)
+            
+            # 成功了！記住這個模型
+            _best_working_model = model_name
+            logger.info(f"✅ 模型 {model_name} 呼叫成功！")
+            
+            if isinstance(data, list):
+                return {"questions": data}
+            return data or {"questions": []}
+            
+        except Exception as e:
+            last_error = e
+            logger.warning(f"❌ 模型 {model_name} 失敗: {str(e)[:100]}")
+            continue # 試下一個
+            
+    # 如果全部都失敗
+    logger.error(f"🔥 所有模型嘗試均告失敗。最後一個錯誤: {last_error}")
+    raise last_error
+
+def _call_gemini_sync(system_prompt: str, user_prompt: str) -> str:
+    """同步呼叫保底"""
+    settings = get_settings()
+    genai.configure(api_key=settings.gemini_api_key)
+    # 同步版本直接用最常用的名稱
+    model = genai.GenerativeModel("gemini-1.5-flash-latest")
     response = model.generate_content(f"{system_prompt}\n\n{user_prompt}")
     return response.text
