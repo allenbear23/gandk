@@ -8,3 +8,5 @@ pydantic-settings
 httpx
 tenacity
 jinja2
+python-multipart
+aiofiles
