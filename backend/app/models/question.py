@@ -54,6 +54,7 @@ class ExamResult(BaseModel):
     total_questions: int
     questions: List[Question]
     generated_at: datetime = Field(default_factory=datetime.now)
+    metadata: Optional[dict] = None
 
 
 # ── 生成請求 ──────────────────────────────────────────────────
