@@ -8,4 +8,12 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    proxy: {
+      '/api/v1': {
+        target: 'https://gandk-api.vercel.app',
+        changeOrigin: true,
+      }
+    }
+  }
 })
