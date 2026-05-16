@@ -27,13 +27,14 @@ async def generate_exam(req: ExamGenerateRequest):
             top_k=5,
         )
 
-        # 2. 組裝 Prompt
+        # 2. 組裝 Prompt (測試期：強制 3 題)
+        test_count = 3
         system_prompt, user_prompt = build_exam_prompt(
             subject_name=subject_name,
             unit_codes=req.unit_codes,
-            question_count=req.question_count,
-            textbook_chunks=context["textbook_chunks"],
-            past_exam_chunks=context["past_exam_chunks"],
+            question_count=test_count,
+            textbook_chunks=[],
+            past_exam_chunks=[],
             difficulty=req.difficulty or 3,
             style_prompt=style_prompt
         )
