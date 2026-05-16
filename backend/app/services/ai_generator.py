@@ -15,8 +15,9 @@ def _get_model():
     if _model is None:
         settings = get_settings()
         genai.configure(api_key=settings.gemini_api_key)
+        # 修正：使用確切的模型名稱 gemini-1.5-flash-latest
         _model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
+            model_name="gemini-1.5-flash-latest",
             generation_config=genai.GenerationConfig(
                 temperature=0.2,
                 max_output_tokens=2048,
@@ -26,7 +27,7 @@ def _get_model():
     return _model
 
 def _call_gemini_sync(system_prompt: str, user_prompt: str) -> str:
-    """同步呼叫函式，供科目風格分析等後台任務使用"""
+    """同步呼叫"""
     model = _get_model()
     response = model.generate_content(f"{system_prompt}\n\n{user_prompt}")
     return response.text
@@ -38,9 +39,10 @@ async def generate_questions(
     unit_codes: List[str],
     max_retries: int = 0,
 ) -> dict:
-    """使用原生非同步呼叫 Gemini"""
+    """非同步呼叫"""
     model = _get_model()
     try:
+        # 使用最新的非同步呼叫方式
         response = await model.generate_content_async(
             f"{system_prompt}\n\n{user_prompt}"
         )
