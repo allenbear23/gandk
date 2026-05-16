@@ -92,5 +92,6 @@ async def generate_exam(req: ExamGenerateRequest):
             return exam_result
 
     except Exception as e:
-        logger.error(f"❌ 考卷生成失敗: {e}", exc_info=True)
+        import traceback
+        logger.error(f"❌ 考卷生成崩潰！詳細錯誤: \n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"考卷生成失敗: {str(e)}")

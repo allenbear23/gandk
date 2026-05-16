@@ -54,7 +54,10 @@ def add_dynamic_header_table(doc, metadata, default_subject):
 
 def export_to_docx(exam_result: ExamResult) -> bytes:
     doc = Document()
+    # 取得 metadata，確保絕對不會是 None
     metadata = getattr(exam_result, 'metadata', {})
+    if metadata is None:
+        metadata = {}
     
     section = doc.sections[0]
     section.top_margin = Inches(0.4)
