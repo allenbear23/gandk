@@ -73,14 +73,52 @@ async def create_unit(subject_id: str, data: UnitCreate):
 @router.post("/{subject_id}/analyze-style-from-doc/{document_id}")
 async def analyze_style_from_doc(subject_id: str, document_id: str):
     sb = get_supabase()
-    chunks_res = sb.table("document_chunks").select("chunk_text").eq("document_id", document_id).limit(10).execute()
+    # 移除 .limit(10) 並以 chunk_index 排序，以讀取並還原完整的考古題內容
+    chunks_res = sb.table("document_chunks").select("chunk_text").eq("document_id", document_id).order("chunk_index").execute()
     if not chunks_res.data:
         raise HTTPException(status_code=404, detail="找不到文件內容")
     
     sample_text = "\n".join([c["chunk_text"] for c in chunks_res.data])
-    analysis_prompt = f"請分析考古題產出『風格指令』。範本：\n{sample_text}"
+    
+    analyzer_system = """你是一位極度嚴謹且專業的台灣高中命題結構與風格分析師。
+你的任務是「精確、無死角地分析考古題的題型與格式結構」，並為該科目建立一套「黃金命題標準指令」。
+
+【極重要核心原則】：
+生成的考卷必須與分析的考古題在「格式、題數、題型、配分以及結構上百分之百完全一致」。考古題並非只是參考，而是必須被「一模一樣地克隆」的黃金藍圖！
+
+請根據所提供的完整考古題內文，分析並輸出包含以下結構的 JSON 格式指令（以 Markdown JSON 代碼塊 ```json ... ``` 包裹）：
+{
+  "style_name": "風格名稱",
+  "document_header": "這張考卷的完整頁首文字與結構格式範例（例如：包含測驗名稱、範圍、座號、班級、姓名等欄位的格式，請保留原始排版文字）",
+  "total_sections_count": "總大題數",
+  "total_questions_count": "整張試卷的總題數，這必須是絕對精確的數字！",
+  "sections": [
+    {
+      "section_id": 1,
+      "section_name": "大題名稱（例如：第一部分：字彙能力測驗）",
+      "question_count": "本大題包含的精確題數（此大題在生成時必須剛好只有這麼多題！）",
+      "question_type": "本大題的精確題型（例如：四選一單選題 (A)(B)(C)(D)、填空題、問答題等）",
+      "scoring_rule": "本大題的配分規則（例如：佔比 20%，每題 4 分）",
+      "formatting_style": "本大題中每一題的呈現格式規範（例如：題目文字最後要加 '(Handwritten answer: [選項])' 等，必須包含與考古題完全一致的微小格式特徵）",
+      "content_rules": "本大題的語意與命題細節規範（例如：考驗哪些特定字彙、文法、文體或長度）"
+    }
+  ],
+  "formatting_rules": {
+    "option_style": "選擇題選項的格式（例如使用 (A) (B) (C) (D)）",
+    "answer_simulation_pattern": "是否有模擬作答格式（如 '(Handwritten answer: [選項])' 或 '(Handwritten: [單字])'）"
+  }
+}
+"""
+
+    analysis_prompt = f"""請詳讀以下完整的考古題內文，精確分析其每一大題的結構、題型、各題格式、配分及題數。
+分析完畢後，請**嚴格按照規定的 JSON 格式**輸出風格指令。
+
+【考古題內文】：
+{sample_text}
+"""
+
     try:
-        style_prompt = _call_gemini_sync("你是一位專業教育文件分析師。", analysis_prompt)
+        style_prompt = _call_gemini_sync(analyzer_system, analysis_prompt)
         sb.table("subjects").update({"style_prompt": style_prompt}).eq("id", subject_id).execute()
         return {"status": "success", "style_prompt": style_prompt}
     except Exception as e:

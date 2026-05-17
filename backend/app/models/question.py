@@ -37,6 +37,7 @@ class Question(BaseModel):
     answer: str = Field(..., pattern="^[ABCD]$")
     explanation: str
     unit_code: Optional[str] = "1-1"
+    section: Optional[str] = None
     difficulty: int = Field(default=3, ge=1, le=5)
 
     @field_validator("choices")

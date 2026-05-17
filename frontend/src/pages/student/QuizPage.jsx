@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, CheckCircle2, XCircle, Brain, ArrowLeft, Zap, Info, Award, HelpCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle2, XCircle, Brain, ArrowLeft, Zap, Info, Award, HelpCircle, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function QuizPage() {
@@ -134,6 +134,13 @@ export default function QuizPage() {
                 <span>◎ 測驗試題主體說明專區</span>
                 <span className="bg-red-600 text-white px-2 py-0.5 text-[10px] font-bold font-mono">第 {currentIndex + 1} 題</span>
               </div>
+              
+              {currentQ.section && (
+                <div className="mb-4 px-3 py-1.5 bg-[#ffffd0] border border-yellow-400 text-xs font-black text-[#cc0000] font-mono flex items-center shadow-inner">
+                  <Zap className="w-3.5 h-3.5 mr-1.5 text-red-600 animate-pulse" />
+                  大題單元：【{currentQ.section}】
+                </div>
+              )}
               
               <div className="flex items-start">
                 <span className="flex-shrink-0 w-8 h-8 bg-[#cc0000] border-2 border-yellow-400 text-yellow-300 font-black flex items-center justify-center mr-4 select-none font-mono text-lg shadow-sm">
