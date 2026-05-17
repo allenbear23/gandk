@@ -80,14 +80,19 @@ export default function HomePage() {
       const res = await examAPI.generateExam(payload);
 
       if (mode === 'print') {
-        // Handle DOCX Blob download
-        const url = window.URL.createObjectURL(new Blob([res.data]));
+        // 使用更嚴謹的雙重保底機制封裝 Blob，強制帶入正確的 Word 檔案 MIME-Type
+        const blob = res.data instanceof Blob 
+          ? res.data 
+          : new Blob([res.data], { type: 'application/msword' });
+          
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         link.setAttribute('download', `中華民國智慧e化模擬考卷_${Date.now()}.doc`);
         document.body.appendChild(link);
         link.click();
         link.remove();
+        window.URL.revokeObjectURL(url); // 釋放記憶體
       } else {
         // Mode Quiz: Redirect to QuizPage with data
         navigate('/quiz', { state: { examData: res.data } });
