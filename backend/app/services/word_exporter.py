@@ -99,6 +99,14 @@ def export_to_docx(exam_result: ExamResult) -> bytes:
     except Exception as e:
         logger.warning(f"⚠️ 無法讀取或解析風格設定，將使用預設格式: {e}")
 
+    # 建立大題屬性對照表，使排版系統完全「資料庫驅動」，支援所有學科科目！
+    sections_meta = {}
+    if style_json and "sections" in style_json:
+        for sec in style_json["sections"]:
+            name = sec.get("section_name", "")
+            if name:
+                sections_meta[name] = sec
+
     # 1. 建立單欄頁首
     last_header_para = None
     if style_json and "document_header" in style_json:
@@ -161,8 +169,13 @@ def export_to_docx(exam_result: ExamResult) -> bytes:
         if q.section and q.section != current_section_name:
             current_section_name = q.section
             
+            # 從大題對照表讀取屬性
+            sec_meta = sections_meta.get(current_section_name, {})
+            layout_type = sec_meta.get("layout_type", "").lower()
+            
             # 判斷是否需要重置題號：非聽力測驗大題，均重置題號為 1
-            if "聽力" not in current_section_name:
+            is_listening_sec = (layout_type == "listening") or ("聽力" in current_section_name)
+            if not is_listening_sec:
                 sec_q_counter = 1
             else:
                 # 聽力測驗跨 Part 題號連續
@@ -178,7 +191,8 @@ def export_to_docx(exam_result: ExamResult) -> bytes:
             set_run_font(run_sec, font_name="標楷體", size_pt=11.5, bold=True, underline=True)
             
             # 特殊外框處理：若是「文意選填」大題，在標題下方自動渲染一個單字庫外框 (Word Bank Box)
-            if "文意選填" in current_section_name:
+            is_word_bank_sec = (layout_type == "word_bank") or ("文意選填" in current_section_name)
+            if is_word_bank_sec:
                 # 嘗試從 q.question 或預置內容尋找單字選項庫，若無則預設一組符合課本範圍的詞庫
                 word_bank_text = "A. overuse    B. feathery    C. scarce    D. recovery\nE. shelters    F. adopt    G. compete    H. remain\nI. scientific    J. researchers"
                 # 如果 question 內容包含 Word Bank: 標記，進行解析
@@ -189,12 +203,15 @@ def export_to_docx(exam_result: ExamResult) -> bytes:
                 add_word_bank_box(doc, word_bank_text)
                 doc.add_paragraph() # 空行分隔
 
-        # 4. 根據大題類型進行精細排版
-        is_listening = "聽力" in (q.section or "")
-        is_vocabulary = "字彙" in (q.section or "")
-        is_cloze = "克漏字" in (q.section or "")
-        is_completion = "文意選填" in (q.section or "")
-        is_translation = "翻譯" in (q.section or "")
+        # 4. 根據大題類型進行精細排版 (支援 layout_type 自訂與中文關鍵字模糊匹配雙通道)
+        sec_meta = sections_meta.get(q.section, {}) if q.section else {}
+        layout_type = sec_meta.get("layout_type", "").lower() if isinstance(sec_meta, dict) else ""
+        
+        is_listening = (layout_type == "listening") or ("聽力" in (q.section or ""))
+        is_vocabulary = (layout_type == "vocabulary") or ("字彙" in (q.section or ""))
+        is_cloze = (layout_type == "cloze") or ("克漏字" in (q.section or ""))
+        is_completion = (layout_type == "word_bank") or ("文意選填" in (q.section or ""))
+        is_translation = (layout_type == "translation") or ("翻譯" in (q.section or ""))
 
         # 更新聽力全局計數器
         if is_listening:

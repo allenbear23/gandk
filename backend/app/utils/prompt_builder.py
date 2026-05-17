@@ -138,6 +138,7 @@ def build_exam_prompt_for_single_section(
     difficulty: int = 3,
     textbook_chunks: List[dict] = [],
     past_exam_chunks: List[dict] = [],
+    layout_type: str = "",
 ) -> tuple[str, str]:
     """
     專為「單一大題」設計的超高擬真度命題 Prompt。
@@ -149,9 +150,15 @@ def build_exam_prompt_for_single_section(
     first_unit = unit_codes[0] if unit_codes else "1-1"
     difficulty_desc = {1: "簡單", 2: "中易", 3: "中等", 4: "中難", 5: "困難"}[difficulty]
 
-    # 大題專屬極限精準命題與格式規範
+    # 大題專屬極限精準命題與格式規範 (支援 layout_type 與中文關鍵字模糊匹配雙通道)
     special_section_instructions = ""
-    if "字彙" in sec_name:
+    lt = (layout_type or "").lower()
+    is_vocab_lt = (lt == "vocabulary") or ("字彙" in sec_name)
+    is_cloze_lt = (lt == "cloze") or ("克漏字" in sec_name or "克漏" in sec_name)
+    is_completion_lt = (lt == "word_bank") or ("文意選填" in sec_name or "選填" in sec_name)
+    is_translation_lt = (lt == "translation") or ("翻譯" in sec_name or "填空式翻譯" in sec_name)
+
+    if is_vocab_lt:
         special_section_instructions = """
 * 📝【字彙題型特規】
   1. 本大題為「字彙」填空題，每題的 "choices" 欄位必須為空陣列 `[]`（絕對不要有 A, B, C, D 選項）。
@@ -159,14 +166,14 @@ def build_exam_prompt_for_single_section(
   3. "answer" 欄位必須是該目標單字的【完整拼寫】（例如：`remote`、`plenty`、`journey`）。
   4. "explanation" 欄位寫出單字中文意思以及整句的句意解析。
 """
-    elif "克漏字" in sec_name or "克漏" in sec_name:
+    elif is_cloze_lt:
         special_section_instructions = f"""
 * 📝【克漏字題型特規】
   1. 本大題為「克漏字」綜合測驗。
   2. 第 1 題的 "question" 欄位必須包含【整篇完整的長篇閱讀文章】，並在文章中要填空的地方用 `(1) _______`、`(2) _______` ... 到 `({sec_cnt}) _______` 標示出所有挖空的位置。第 1 題的 "choices" 則是第 (1) 個挖空的選項。
-  3. 隨後的第 2 題到第 {sec_cnt} 題，其 "question" 欄位【只需填寫題號即可】（例如：`(2)`、`(3)`），不可重複整篇文章。其 "choices" 則為對應題號空格的 A, B, C, D 四個選項。
+  3. 隨後的第 2 題到第 {sec_cnt} 題，其 "question" 欄位【只需填寫題號即可】（例如：`(2)`、`(3)`），不可重複整篇文章。其 "choices" 則為對應題號空格 of A, B, C, D 四個選項。
 """
-    elif "文意選填" in sec_name or "選填" in sec_name:
+    elif is_completion_lt:
         special_section_instructions = f"""
 * 📝【文意選填題型特規】
   1. 本大題為「文意選填」。
@@ -176,7 +183,7 @@ def build_exam_prompt_for_single_section(
      在單字庫下方，換行提供【整篇完整的長篇閱讀文章】，並在挖空處標記 `(1) _______`、`(2) _______` ... 到 `({sec_cnt}) _______`。第 1 題的 "choices" 為 `A` 到 `J` 共 10 個選項，"answer" 則是第一題對應的單字字母（如 `C`）。
   3. 隨後的第 2 題到第 {sec_cnt} 題，其 "question" 欄位【只需填寫題號即可】（例如：`(2)`、`(3)`）。其 "choices" 固定提供相同的 `A` 到 `J` 共 10 個選項，"answer" 為對應大寫字母。
 """
-    elif "翻譯" in sec_name or "填空式翻譯" in sec_name:
+    elif is_translation_lt:
         special_section_instructions = """
 * 📝【填空式翻譯題型特規】
   1. 本大題為中翻英「填空式翻譯」題，每題的 "choices" 欄位必須為空陣列 `[]`（不要有選項）。
