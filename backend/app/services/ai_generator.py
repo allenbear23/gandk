@@ -13,6 +13,7 @@ class APIKeyRotator:
     def __init__(self):
         self.keys = []
         self._index = 0
+        self.cooldowns = {} # key -> float (cooldown end timestamp)
         self.reload_keys()
 
     def reload_keys(self):
@@ -23,16 +24,40 @@ class APIKeyRotator:
             settings = get_settings()
             raw_key = settings.gemini_api_key or ""
             # 以逗號切割多支金鑰，並去除空白字元
-            self.keys = [k.strip() for k in raw_key.split(",") if k.strip()]
-            self._index = 0
-            logger.info(f"🔑 APIKeyRotator 已成功初始化並載入 {len(self.keys)} 支 API Key")
+            new_keys = [k.strip() for k in raw_key.split(",") if k.strip()]
+            
+            # 只有當金鑰清單發生改變時，才更新並重置，避免平行呼叫重置索引與冷卻狀態！
+            if new_keys != self.keys:
+                self.keys = new_keys
+                self.cooldowns = {k: 0.0 for k in self.keys}
+                self._index = 0
+                logger.info(f"🔑 APIKeyRotator 載入新金鑰清單，共 {len(self.keys)} 支金鑰")
         except Exception as e:
             logger.error(f"⚠️ 無法初始化 APIKeyRotator: {e}")
-            self.keys = []
+
+    def mark_cooldown(self, key: str, duration: float = 50.0):
+        """將特定金鑰標記為冷卻狀態，避開調用"""
+        if key in self.keys:
+            import time
+            self.cooldowns[key] = time.time() + duration
+            logger.warning(f"❄️ 金鑰 [{key[:8]}...] 調用達上限，標記冷卻 {duration:.1f} 秒")
 
     def get_current_key(self) -> str:
         if not self.keys:
             return ""
+        
+        import time
+        now = time.time()
+        # 尋找一個沒有在冷卻中的金鑰，最多嘗試金鑰個數次
+        for _ in range(len(self.keys)):
+            key = self.keys[self._index % len(self.keys)]
+            cooldown_until = self.cooldowns.get(key, 0.0)
+            if now >= cooldown_until:
+                return key
+            # 若在冷卻中，則自動輪轉到下一個
+            self._index += 1
+            
+        # 若全部都在冷卻中，則退回使用原本當前索引的金鑰 (保底)
         return self.keys[self._index % len(self.keys)]
 
     def rotate(self) -> str:
@@ -126,13 +151,24 @@ async def generate_questions(
                 err_msg = str(e)
                 logger.warning(f"❌ 模型 {model_name} 失敗 (金鑰 {key_rotator._index % num_keys + 1} 嘗試 {key_attempt+1}/{num_keys}): {err_msg[:150]}")
                 
-                # 遇到 Quota Exhausted / 429 / Rate Limit 等情況，立刻輪轉金鑰並做短暫延遲
+                # 遇到 Quota Exhausted / 429 / Rate Limit 等情況，立刻標記冷卻並輪轉
+                if "429" in err_msg or "ResourceExhausted" in err_msg or "quota" in err_msg.lower():
+                    # 嘗試從 Google 錯誤訊息中解析具體的冷卻秒數（例如: "Please retry in 46.610192564s."）
+                    cooldown_sec = 50.0
+                    try:
+                        if "retry in" in err_msg:
+                            parts = err_msg.split("retry in")
+                            sec_str = parts[1].strip().split("s")[0].strip()
+                            cooldown_sec = float(sec_str) + 2.0 # 加上 2 秒保險緩衝
+                    except Exception:
+                        pass
+                    
+                    key_rotator.mark_cooldown(active_key, duration=cooldown_sec)
+                    logger.info(f"⏳ 偵測到金鑰頻率限制，該金鑰將被冷凍避開 {cooldown_sec:.1f} 秒...")
+                    await asyncio.sleep(2)
+
                 if num_keys > 1:
                     key_rotator.rotate()
-                
-                if "429" in err_msg or "ResourceExhausted" in err_msg or "quota" in err_msg.lower():
-                    logger.info("⏳ 偵測到金鑰頻率限制，暫停 2 秒後由下一支金鑰接棒...")
-                    await asyncio.sleep(2)
                 
                 # 如果已經嘗試完所有金鑰，就跳出輪轉，嘗試下一個模型
                 if key_attempt == num_keys - 1:
