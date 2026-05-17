@@ -88,7 +88,7 @@ export default function HomePage() {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `中華民國智慧e化模擬考卷_${Date.now()}.doc`);
+        link.setAttribute('download', `中華民國智慧e化模擬考卷_${Date.now()}.docx`);
         document.body.appendChild(link);
         link.click();
         link.remove();

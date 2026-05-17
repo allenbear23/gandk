@@ -55,15 +55,15 @@ async def generate_exam(req: ExamGenerateRequest):
             generated_at=datetime.now(timezone.utc)
         )
 
-        # 5. 回應模式 (使用穩定的 HTML-to-Doc 格式)
+        # 5. 回應模式 (使用極度穩定的原生二進位制 DOCX 格式)
         if req.mode == GenerationMode.PRINT:
             from app.services.word_exporter import export_to_docx
             docx_bytes = export_to_docx(exam_result)
             return Response(
                 content=docx_bytes,
-                media_type="application/msword", # 改用 msword 格式
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 headers={
-                    "Content-Disposition": "attachment; filename=exam_results.doc" # 副檔名改為 .doc
+                    "Content-Disposition": "attachment; filename=exam_results.docx"
                 }
             )
         else:
