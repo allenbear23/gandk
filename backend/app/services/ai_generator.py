@@ -60,6 +60,43 @@ class APIKeyRotator:
         # 若全部都在冷卻中，則退回使用原本當前索引的金鑰 (保底)
         return self.keys[self._index % len(self.keys)]
 
+    async def get_available_key_with_backoff(self) -> str:
+        """非同步獲取可用金鑰。若全部金鑰都在冷卻中，會自動暫停等待最短的解凍時間，保證不崩潰"""
+        if not self.keys:
+            return ""
+        
+        import time
+        import asyncio
+        
+        while True:
+            now = time.time()
+            shortest_wait = None
+            
+            # 尋找立即可用的金鑰
+            for _ in range(len(self.keys)):
+                key = self.keys[self._index % len(self.keys)]
+                cooldown_until = self.cooldowns.get(key, 0.0)
+                wait_time = cooldown_until - now
+                
+                if wait_time <= 0:
+                    # 找到立即可用的金鑰！
+                    return key
+                
+                # 記錄最短等待時間
+                if shortest_wait is None or wait_time < shortest_wait:
+                    shortest_wait = wait_time
+                
+                self._index += 1
+                
+            # 若所有金鑰都在冷卻中
+            if shortest_wait is not None and shortest_wait > 0:
+                logger.info(f"⏳ 所有 API 金鑰均在冷卻限制中。將暫停等待最短金鑰解凍 {shortest_wait:.1f} 秒，防止崩潰...")
+                await asyncio.sleep(shortest_wait + 0.5)
+                continue
+                
+            # 保底回傳
+            return self.keys[self._index % len(self.keys)]
+
     def rotate(self) -> str:
         if not self.keys:
             return ""
@@ -113,7 +150,7 @@ async def generate_questions(
     for model_name in candidate_models:
         # 對於每一個模型，我們會對所有已配置的 API 金鑰進行輪轉嘗試
         for key_attempt in range(num_keys):
-            active_key = key_rotator.get_current_key()
+            active_key = await key_rotator.get_available_key_with_backoff()
             try:
                 current_key_num = (key_rotator._index % num_keys) + 1
                 logger.info(f"🧪 嘗試模型: {model_name} (使用第 {current_key_num}/{num_keys} 支金鑰)...")
