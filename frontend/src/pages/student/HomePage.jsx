@@ -99,7 +99,25 @@ export default function HomePage() {
       }
     } catch (err) {
       console.error(err);
-      const errorMsg = err.response?.data?.detail || err.message || "發生未知系統錯誤";
+      let errorMsg = err.message || "發生未知系統錯誤";
+      
+      // 如果回傳資料是 Blob，將其讀取為文字以解析後端詳細錯誤
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          try {
+            const json = JSON.parse(text);
+            errorMsg = json.detail || text;
+          } catch (e) {
+            errorMsg = text;
+          }
+        } catch (e) {
+          console.error("無法解析錯誤 Blob:", e);
+        }
+      } else if (err.response?.data?.detail) {
+        errorMsg = err.response.data.detail;
+      }
+      
       alert(`【申辦失敗】系統出題失敗！詳細原因如下：\n${errorMsg}`);
     } finally {
       setLoading(false);
