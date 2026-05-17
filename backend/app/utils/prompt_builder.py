@@ -142,16 +142,16 @@ def build_exam_prompt_for_single_section(
     custom_requirements: str = "",
 ) -> tuple[str, str]:
     """
-    專為「單一大題」設計的超高擬真度命題 Prompt。
+    精簡、高密度的單一大題命題 Prompt，大幅降低 Token 耗費與延遲。
     """
-    textbook_context = _format_chunks(textbook_chunks, "課本核心內容")
-    past_exam_context = _format_chunks(past_exam_chunks, "考古題風格參考")
+    textbook_context = _format_chunks(textbook_chunks, "課本內容")
+    past_exam_context = _format_chunks(past_exam_chunks, "考古題參考")
 
     units_str = "、".join(unit_codes)
     first_unit = unit_codes[0] if unit_codes else "1-1"
     difficulty_desc = {1: "簡單", 2: "中易", 3: "中等", 4: "中難", 5: "困難"}[difficulty]
 
-    # 大題專屬極限精準命題與格式規範 (支援 layout_type 與中文關鍵字模糊匹配雙通道)
+    # 特殊題型精簡特規
     special_section_instructions = ""
     lt = (layout_type or "").lower()
     is_vocab_lt = (lt == "vocabulary") or ("字彙" in sec_name)
@@ -160,98 +160,44 @@ def build_exam_prompt_for_single_section(
     is_translation_lt = (lt == "translation") or ("翻譯" in sec_name or "填空式翻譯" in sec_name)
 
     if is_vocab_lt:
-        special_section_instructions = """
-* 📝【字彙題型特規】
-  1. 本大題為「字彙」填空題，每題的 "choices" 欄位必須為空陣列 `[]`（絕對不要有 A, B, C, D 選項）。
-  2. 題目 ("question") 必須提供一個英文句子，且目標單字必須呈現為「首尾字母+中間底線」的半拼寫格式（例如，如果答案單字是 remote，必須在題目中寫成 `r_____`；如果是 plenty，必須寫成 `p_____y`；如果是 journey，必須寫成 `j_____y`）。
-  3. "answer" 欄位必須是該目標單字的【完整拼寫】（例如：`remote`、`plenty`、`journey`）。
-  4. "explanation" 欄位寫出單字中文意思以及整句的句意解析。
-"""
+        special_section_instructions = """* 📝【字彙題型特規】: choices必須為空陣列 `[]`。題目("question")提供英文句，目標單字呈現首尾字母與底線（如 "r_____e"）。"answer"填入該目標單字的完整拼寫。"""
     elif is_cloze_lt:
-        special_section_instructions = f"""
-* 📝【克漏字題型特規】
-  1. 本大題為「克漏字」綜合測驗。
-  2. 第 1 題的 "question" 欄位必須包含【整篇完整的長篇閱讀文章】，並在文章中要填空的地方用 `(1) _______`、`(2) _______` ... 到 `({sec_cnt}) _______` 標示出所有挖空的位置。第 1 題的 "choices" 則是第 (1) 個挖空的選項。
-  3. 隨後的第 2 題到第 {sec_cnt} 題，其 "question" 欄位【只需填寫題號即可】（例如：`(2)`、`(3)`），不可重複整篇文章。其 "choices" 則為對應題號空格 of A, B, C, D 四個選項。
-"""
+        special_section_instructions = f"""* 📝【克漏字題型特規】: 第 1 題 "question" 包含整篇挖空長文（挖空標記 `(1) _______` 到 `({sec_cnt}) _______`），"choices" 為第 1 空格選項。其餘第 2 到 {sec_cnt} 題，"question" 僅填寫題號（如 `(2)`），"choices" 則為對應題號選項。"""
     elif is_completion_lt:
-        special_section_instructions = f"""
-* 📝【文意選填題型特規】
-  1. 本大題為「文意選填」。
-  2. 第 1 題的 "question" 欄位必須以特別的【備選單字庫 (Word Bank)】開頭。格式必須精確為：
-     `Word Bank: A. 單字A    B. 單字B    C. 單字C    D. 單字D    E. 單字E    F. 單字F    G. 單字G    H. 單字H    I. 單字I    J. 單字J`
-     （必須正好提供 10 個備選英文字，與你的單字範圍或課文相關）。
-     在單字庫下方，換行提供【整篇完整的長篇閱讀文章】，並在挖空處標記 `(1) _______`、`(2) _______` ... 到 `({sec_cnt}) _______`。第 1 題的 "choices" 為 `A` 到 `J` 共 10 個選項，"answer" 則是第一題對應的單字字母（如 `C`）。
-  3. 隨後的第 2 題到第 {sec_cnt} 題，其 "question" 欄位【只需填寫題號即可】（例如：`(2)`、`(3)`）。其 "choices" 固定提供相同的 `A` 到 `J` 共 10 個選項，"answer" 為對應大寫字母。
-"""
+        special_section_instructions = f"""* 📝【文意選填題型特規】: 第 1 題 "question" 開頭為單字庫 `Word Bank: A.單字A  B.單字B...` (正好 10 個英文字)，下方附整篇挖空長文（標記 `(1) _______` 到 `({sec_cnt}) _______`）。其餘第 2 到 {sec_cnt} 題，"question" 僅填寫題號（如 `(2)`），"choices" 固定為 `A` 到 `J` 的 10 個選項。"""
     elif is_translation_lt:
-        special_section_instructions = """
-* 📝【填空式翻譯題型特規】
-  1. 本大題為中翻英「填空式翻譯」題，每題的 "choices" 欄位必須為空陣列 `[]`（不要有選項）。
-  2. 題目 ("question") 必須先給出中文段落，接著給出英文翻譯，並在挖空的位置標示為 `(1) _______`、`(2) _______` 等。
-  3. "answer" 欄位為該空格填入的正確單字或片語（例如 `linked to` 或 `appliance`）。
-"""
+        special_section_instructions = """* 📝【填空式翻譯題型特規】: choices 必須為空陣列 `[]`。題目("question")給予中文段落與挖空英文 `(1) _______`、`(2) _______` 等，"answer"為填入的正確英文字詞。"""
     else:
-        # 一般選擇題型
         if sec_type == "multiple_choice":
-            special_section_instructions = """
-* 📝【一般選擇題型規範】
-  1. 每題必須提供 4 個選項（A, B, C, D）。
-  2. "question" 為單獨的英文題目句。
-"""
+            special_section_instructions = """* 📝【一般選擇題型】: 每題提供 4 個選項（A, B, C, D），"question" 為題目句。"""
         else:
-            special_section_instructions = """
-* 📝【非選擇題型規範】
-  1. 每題的 "choices" 必須為空陣列 `[]`，"answer" 為該題的正確文字答案。
-"""
+            special_section_instructions = """* 📝【非選擇題型】: choices 必須為空陣列 `[]`，"answer" 為正確答案。"""
 
-    # 注入使用者自定義的附加限制與要求
-    custom_req_instructions = ""
-    if custom_requirements:
-        custom_req_instructions = f"""
-* ⚠️【重要：出題附加限制與要求】
-  {custom_requirements}
-"""
+    custom_req_instructions = f"* ⚠️【自訂限制要求】: {custom_requirements}" if custom_requirements else ""
 
-    system_prompt = f"""你是一位擁有 20 年經驗的台灣高中{subject_name}科名師。
-請根據提供的素材，出一份正式的、符合高中段考標準的 JSON 格式考卷。
-
-【重要：此大題專屬風格與結構規範】
-- 大題名稱：{sec_name}
-- 題型類別：{sec_type}
-- 配分說明：{scoring}
-- 預計題數：此 API 呼叫必須且只能產出剛好 {sec_cnt} 道題目，題號必須為 1 到 {sec_cnt}！
+    system_prompt = f"""你是一位台灣高中{subject_name}教師。請產出剛好 {sec_cnt} 道題目的 JSON 試卷。
+【大題資訊】: 名稱: "{sec_name}", 題型: {sec_type}, 配分: {scoring}, 題號 id: 1 到 {sec_cnt}。
 {special_section_instructions}
 {custom_req_instructions}
 
-## 命題與格式規範
-1. **語氣**：使用專業的學術命題風格，完全克隆台灣高中考卷的排版與表達方式。
-2. **結構**：必須嚴格遵守以下 JSON 結構，且每一題都必須包含 "unit_code" 與 "section" 欄位。
-
-## JSON 結構範例
+請嚴格遵守 JSON 結構輸出:
 {{
   "questions": [
     {{
       "id": 1,
       "unit_code": "{first_unit}",
       "section": "{sec_name}",
-      "question": "題目文字...",
-      "choices": [
-        {{"key": "A", "text": "選項內容"}},
-        {{"key": "B", "text": "選項內容"}},
-        {{"key": "C", "text": "選項內容"}},
-        {{"key": "D", "text": "選項內容"}}
-      ],
+      "question": "...",
+      "choices": [{{"key": "A", "text": "..."}}],
       "answer": "A",
-      "explanation": "【解析】..."
+      "explanation": "..."
     }}
   ]
 }}"""
 
-    user_prompt = f"""請產出符合風格規範的{subject_name}大題「{sec_name}」試題。
+    user_prompt = f"""產出高中{subject_name}科大題「{sec_name}」試題。
 範圍：{units_str}
 難度：{difficulty_desc}
-
 {textbook_context}
 {past_exam_context}
 """
