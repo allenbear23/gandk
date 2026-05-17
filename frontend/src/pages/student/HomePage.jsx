@@ -85,7 +85,7 @@ export default function HomePage() {
         const link = document.createElement('a');
         link.href = url;
         // The backend sends a filename in headers, but we can set a fallback here
-        link.setAttribute('download', `模擬考卷_${Date.now()}.docx`);
+        link.setAttribute('download', `模擬考卷_${Date.now()}.doc`);
         document.body.appendChild(link);
         link.click();
         link.remove();
