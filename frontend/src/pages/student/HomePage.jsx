@@ -172,6 +172,21 @@ export default function HomePage() {
               <div className="roc-announcement-belt">
                 <span>【一般公告】本系統AI出題技術符合國家級標準，10秒快速產出試題！</span>
               </div>
+              <div className="border-b border-gray-400 pb-2 bg-yellow-50 p-1.5 border-l-4 border-red-600">
+                <span className="text-[10px] text-red-600 block font-black">2026-05-17 【最新版更資訊】</span>
+                <a href="#" onClick={(e) => { 
+                  e.preventDefault(); 
+                  alert("【教育部考試評量檢定處 ‧ 智慧e化命題系統 - 重大版本更新】\n\n" + 
+                        "為貫徹政府e化便民政策，提升學子複習效率，本平台已於 2026 年 5 月 17 日完成核心算力大改版：\n\n" +
+                        "1. 🏛️【考古題 100% 精準克隆】：升級文件分析器，自動對齊上傳考古題之「總題數限制」、「大題結構（Sections）」與「頁首考生基本資料區」。\n" +
+                        "2. ✍️【全面支援非選擇題型】：突破傳統選擇題限制，新增對「句子情境字彙填寫」、「中翻英填空式翻譯」等無選項題型的完美命題與解析驗證。\n" +
+                        "3. 📄【高還原度實體 Word 匯出】：重構 Word 考卷電子檔排版，支援標楷體底線大題、選項橫向並列排版及強制分頁答案解析表。\n" +
+                        "4. 💻【刷題介面智慧填空作答】：線上刷題專區智慧適配非選擇題，自動呈現「e化手寫作答模擬輸入區」，供學子打字模擬提交答案並觀看 AI 智慧詳解。\n\n" +
+                        "※ 本局將持續推動便民e化措施，祝各位考生金榜題名！"); 
+                }} className="text-red-700 underline text-xs font-black hover:text-blue-900 block leading-snug">
+                  ★ 智慧e化命題系統重大版本更新成果暨非選擇題型與考古格式克隆功能上線說明
+                </a>
+              </div>
               <div className="border-b border-gray-400 pb-2">
                 <span className="text-[10px] text-gray-500 block">2026-05-17</span>
                 <a href="#" onClick={(e) => { e.preventDefault(); alert("請詳見內政部考試資訊手冊相關附件。"); }} className="text-blue-800 underline text-xs font-bold hover:text-red-600 block">
