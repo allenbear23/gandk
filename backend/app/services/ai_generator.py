@@ -191,6 +191,12 @@ async def generate_questions(
                 if "429" in err_msg or "ResourceExhausted" in err_msg or "quota" in err_msg.lower():
                     # 嘗試從 Google 錯誤訊息中解析具體的冷卻秒數（例如: "Please retry in 46.610192564s."）
                     cooldown_sec = 5.0  # 預設大幅縮短為 5.0 秒，避免被長時間冰凍！
+                    
+                    is_daily_quota = False
+                    if "daily" in err_msg.lower() or "limit exceeded" in err_msg.lower() or "free tier" in err_msg.lower():
+                        is_daily_quota = True
+                        cooldown_sec = 1800.0 # 每日限額或免費額度限制，冷凍該金鑰 30 分鐘
+                        
                     try:
                         if "retry in" in err_msg:
                             parts = err_msg.split("retry in")
@@ -201,6 +207,11 @@ async def generate_questions(
                     
                     key_rotator.mark_cooldown(active_key, duration=cooldown_sec)
                     logger.info(f"⏳ 偵測到金鑰頻率限制，該金鑰將被冷凍避開 {cooldown_sec:.1f} 秒...")
+                    
+                    # 每日配額或免費層限制耗盡，直接拋出異常，不需輪轉其他模型（它們共用同金鑰也會失敗）
+                    if is_daily_quota:
+                        raise e
+                        
                     await asyncio.sleep(2)
 
                 if num_keys > 1:
@@ -270,7 +281,7 @@ async def generate_exam_by_sections(
         
         # 嘗試呼叫 AI (含 429 緩退重試機制與 Semaphore 併發保護)
         res_data = None
-        retries = 3
+        retries = 2 # 縮減為最多重試 2 次即可，內部已有多模型防護
         for attempt in range(retries):
             try:
                 # 使用信號量限制併發
@@ -287,7 +298,10 @@ async def generate_exam_by_sections(
                 break
             except Exception as e:
                 logger.warning(f"⚠️ 大題 [{sec_name}] 嘗試 {attempt+1} 失敗: {e}")
-                if attempt == retries - 1:
+                err_lower = str(e).lower()
+                is_fatal_quota = "quota" in err_lower or "limit" in err_lower or "exhausted" in err_lower
+                
+                if attempt == retries - 1 or is_fatal_quota:
                     raise e
                 # 遇到 429 或其他錯誤時，做漸進式指數退避等待
                 await asyncio.sleep(3 + attempt * 2)
