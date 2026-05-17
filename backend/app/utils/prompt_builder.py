@@ -127,3 +127,75 @@ def _format_chunks(chunks: List[dict], label: str) -> str:
         text = chunk.get("chunk_text", chunk.get("text", ""))
         content += f"\n[片段 {i}]\n{text}\n"
     return content
+
+def build_exam_prompt_for_single_section(
+    subject_name: str,
+    unit_codes: List[str],
+    sec_name: str,
+    sec_cnt: int,
+    sec_type: str,
+    scoring: str,
+    difficulty: int = 3,
+    textbook_chunks: List[dict] = [],
+    past_exam_chunks: List[dict] = [],
+) -> tuple[str, str]:
+    """
+    專為「單一大題」設計的超高擬真度命題 Prompt。
+    """
+    textbook_context = _format_chunks(textbook_chunks, "課本核心內容")
+    past_exam_context = _format_chunks(past_exam_chunks, "考古題風格參考")
+
+    units_str = "、".join(unit_codes)
+    first_unit = unit_codes[0] if unit_codes else "1-1"
+    difficulty_desc = {1: "簡單", 2: "中易", 3: "中等", 4: "中難", 5: "困難"}[difficulty]
+
+    # 非選擇題特別提示
+    non_mc_instructions = ""
+    if sec_type != "multiple_choice":
+        non_mc_instructions = """
+* ⚠️【重要：非選擇題型規範】
+  本大題屬於「非選擇題型」（例如填空、中翻英翻譯、情境填詞等），因此每題的 "choices" 欄位必須為空陣列 `[]`。
+  請勿生成 (A)(B)(C)(D) 選項！"answer" 欄位填寫唯一的正確字彙或整句標準答案。
+"""
+
+    system_prompt = f"""你是一位擁有 20 年經驗的台灣高中{subject_name}科名師。
+請根據提供的素材，出一份正式的、符合高中段考標準的 JSON 格式考卷。
+
+【重要：此大題專屬風格與結構規範】
+- 大題名稱：{sec_name}
+- 題型類別：{sec_type}
+- 配分說明：{scoring}
+- 預計題數：此 API 呼叫必須且只能產出剛好 {sec_cnt} 道題目，題號必須為 1 到 {sec_cnt}！
+
+## 命題與格式規範
+1. **語氣**：使用專業的學術命題風格，完全克隆台灣高中考卷的排版與表達方式。
+2. **結構**：必須嚴格遵守以下 JSON 結構，且每一題都必須包含 "unit_code" 與 "section" 欄位。{non_mc_instructions}
+
+## JSON 結構範例
+{{
+  "questions": [
+    {{
+      "id": 1,
+      "unit_code": "{first_unit}",
+      "section": "{sec_name}",
+      "question": "題目文字...",
+      "choices": [
+        {{"key": "A", "text": "選項內容"}},
+        {{"key": "B", "text": "選項內容"}},
+        {{"key": "C", "text": "選項內容"}},
+        {{"key": "D", "text": "選項內容"}}
+      ],
+      "answer": "A",
+      "explanation": "【解析】..."
+    }}
+  ]
+}}"""
+
+    user_prompt = f"""請產出符合風格規範的{subject_name}大題「{sec_name}」試題。
+範圍：{units_str}
+難度：{difficulty_desc}
+
+{textbook_context}
+{past_exam_context}
+"""
+    return system_prompt, user_prompt

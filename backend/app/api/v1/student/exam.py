@@ -22,24 +22,48 @@ async def generate_exam(req: ExamGenerateRequest):
         # 1. 隔離測試：暫時不檢索，確保穩定
         context = {"textbook_chunks": [], "past_exam_chunks": []}
 
-        # 2. 組裝 Prompt
-        system_prompt, user_prompt = build_exam_prompt(
-            subject_name=subject_name,
-            unit_codes=req.unit_codes,
-            question_count=req.question_count,
-            textbook_chunks=[],
-            past_exam_chunks=[],
-            difficulty=req.difficulty or 3,
-            style_prompt=style_prompt
-        )
+        # 嘗試解析自定義風格 JSON 以進行分大題生成 (100% 複製考古題大題與題數)
+        style_json = None
+        if style_prompt:
+            import json
+            import re
+            try:
+                cleaned = style_prompt.strip()
+                if cleaned.startswith("```"):
+                    cleaned = re.sub(r'^```(?:json)?\s*\n?', '', cleaned, flags=re.IGNORECASE)
+                    cleaned = re.sub(r'\n?```\s*$', '', cleaned)
+                style_json = json.loads(cleaned)
+            except Exception as e:
+                logger.warning(f"⚠️ 解析風格設定失敗，將使用一般命題: {e}")
 
-        # 3. 呼叫 AI
-        res_data = await generate_questions(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            target_count=req.question_count,
-            unit_codes=req.unit_codes,
-        )
+        # 3. 呼叫 AI 生成試題
+        if style_json and "sections" in style_json:
+            from app.services.ai_generator import generate_exam_by_sections
+            res_data = await generate_exam_by_sections(
+                subject_name=subject_name,
+                unit_codes=req.unit_codes,
+                style_json=style_json,
+                difficulty=req.difficulty or 3,
+                textbook_chunks=[],
+                past_exam_chunks=[]
+            )
+        else:
+            # 2. 組裝 Prompt (一般命題保底)
+            system_prompt, user_prompt = build_exam_prompt(
+                subject_name=subject_name,
+                unit_codes=req.unit_codes,
+                question_count=req.question_count,
+                textbook_chunks=[],
+                past_exam_chunks=[],
+                difficulty=req.difficulty or 3,
+                style_prompt=style_prompt
+            )
+            res_data = await generate_questions(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                target_count=req.question_count,
+                unit_codes=req.unit_codes,
+            )
         
         questions = res_data.get("questions", [])
         if not questions and isinstance(res_data, list):
