@@ -231,6 +231,80 @@ async def generate_questions(
     logger.error(f"🔥 所有模型嘗試均告失敗。最後一個錯誤: {last_error}")
     raise last_error
 
+
+async def generate_exam_in_single_call(
+    subject_name: str,
+    unit_codes: List[str],
+    style_json: dict,
+    difficulty: int,
+    textbook_chunks: List[dict] = [],
+    past_exam_chunks: List[dict] = [],
+) -> dict:
+    """
+    極致省電模式 (單次 API 呼叫生成整張考卷所有大題)
+    只會向 Google API 發送一次請求，產出整張考卷的所有大題與題目！
+    """
+    from app.utils.prompt_builder import build_mega_exam_prompt
+    import copy
+    
+    # 建立一個深拷貝，避免修改到原始風格 JSON
+    style_json_scaled = copy.deepcopy(style_json)
+    sections = style_json_scaled.get("sections", [])
+    
+    total_expected = sum(sec.get("question_count", 1) for sec in sections)
+    
+    # 如果總題數大於 22 題，在單次呼叫模式下等比例縮小，防止 Output Token (8,192) 被截斷！
+    max_safe_questions = 22
+    if total_expected > max_safe_questions:
+        ratio = max_safe_questions / total_expected
+        logger.info(f"⚠️ [單次呼叫安全防護] 預計總題數 {total_expected} 超過安全上限 {max_safe_questions}。等比例縮放題數（比例: {ratio:.2f}）...")
+        for sec in sections:
+            orig_cnt = sec.get("question_count", 1)
+            new_cnt = max(1, int(orig_cnt * ratio))
+            sec["question_count"] = new_cnt
+        # 更新縮放後的總題數
+        total_expected = sum(sec.get("question_count", 1) for sec in sections)
+        
+    system_prompt, user_prompt = build_mega_exam_prompt(
+        subject_name=subject_name,
+        unit_codes=unit_codes,
+        style_json=style_json_scaled,
+        difficulty=difficulty,
+        textbook_chunks=textbook_chunks,
+        past_exam_chunks=past_exam_chunks
+    )
+    
+    logger.info(f"⚡ [極致省電模式] 開始單次 API 命題，預計生成 {total_expected} 題...")
+    
+    res_data = await generate_questions(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        target_count=total_expected,
+        unit_codes=unit_codes
+    )
+    
+    # 全局 ID 重排，確保 id 遞增
+    all_questions = res_data.get("questions", [])
+    if not all_questions and isinstance(res_data, list):
+        all_questions = res_data
+        
+    current_global_id = 1
+    processed_questions = []
+    
+    for q in all_questions:
+        if isinstance(q, dict):
+            q["id"] = current_global_id
+            current_global_id += 1
+            processed_questions.append(q)
+        else:
+            q.id = current_global_id
+            current_global_id += 1
+            processed_questions.append(q)
+            
+    logger.info(f"🎉 單次生成完成！總共獲得 {len(processed_questions)} 題。")
+    return {"questions": processed_questions}
+
+
 async def generate_exam_by_sections(
     subject_name: str,
     unit_codes: List[str],

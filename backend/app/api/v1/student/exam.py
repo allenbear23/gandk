@@ -38,15 +38,31 @@ async def generate_exam(req: ExamGenerateRequest):
 
         # 3. 呼叫 AI 生成試題
         if style_json and "sections" in style_json:
-            from app.services.ai_generator import generate_exam_by_sections
-            res_data = await generate_exam_by_sections(
-                subject_name=subject_name,
-                unit_codes=req.unit_codes,
-                style_json=style_json,
-                difficulty=req.difficulty or 3,
-                textbook_chunks=[],
-                past_exam_chunks=[]
-            )
+            import os
+            use_single_call = os.getenv("SINGLE_API_CALL_MODE", "true").lower() == "true"
+            
+            if use_single_call:
+                from app.services.ai_generator import generate_exam_in_single_call
+                logger.info("⚡ [出題模式切換] 當前啟用：單次 API 呼叫極致省電模式 (SINGLE_API_CALL_MODE = True)")
+                res_data = await generate_exam_in_single_call(
+                    subject_name=subject_name,
+                    unit_codes=req.unit_codes,
+                    style_json=style_json,
+                    difficulty=req.difficulty or 3,
+                    textbook_chunks=[],
+                    past_exam_chunks=[]
+                )
+            else:
+                from app.services.ai_generator import generate_exam_by_sections
+                logger.info("🚀 [出題模式切換] 當前啟用：分大題平行快速模式 (SINGLE_API_CALL_MODE = False)")
+                res_data = await generate_exam_by_sections(
+                    subject_name=subject_name,
+                    unit_codes=req.unit_codes,
+                    style_json=style_json,
+                    difficulty=req.difficulty or 3,
+                    textbook_chunks=[],
+                    past_exam_chunks=[]
+                )
         else:
             # 2. 組裝 Prompt (一般命題保底)
             system_prompt, user_prompt = build_exam_prompt(

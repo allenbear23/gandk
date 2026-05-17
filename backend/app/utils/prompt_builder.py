@@ -202,3 +202,98 @@ def build_exam_prompt_for_single_section(
 {past_exam_context}
 """
     return system_prompt, user_prompt
+
+
+def build_mega_exam_prompt(
+    subject_name: str,
+    unit_codes: List[str],
+    style_json: dict,
+    difficulty: int = 3,
+    textbook_chunks: List[dict] = [],
+    past_exam_chunks: List[dict] = [],
+) -> tuple[str, str]:
+    """
+    將所有大題打包，構建出一個單次 API 請求即可生成整張考卷所有大題的 Mega-Prompt！
+    此模式下，AI 會一次性輸出包含所有大題所有題目的 questions 列表。
+    """
+    first_unit = unit_codes[0] if unit_codes else "1-1"
+    units_str = "、".join(unit_codes)
+    difficulty_desc = {1: "簡單", 2: "中易", 3: "中等", 4: "中難", 5: "困難"}[difficulty]
+    
+    sections = style_json.get("sections", [])
+    
+    # 建立大題的清單與規則說明
+    section_rules = []
+    total_q = 0
+    
+    for idx, sec in enumerate(sections, 1):
+        sec_name = sec.get("section_name", f"第 {idx} 大題")
+        sec_cnt = sec.get("question_count", 1)
+        sec_type = sec.get("question_type", "multiple_choice")
+        scoring = sec.get("scoring_rule", "")
+        layout_type = sec.get("layout_type", "")
+        
+        # 題型特殊規則
+        lt = (layout_type or "").lower()
+        is_vocab_lt = (lt == "vocabulary") or ("字彙" in sec_name)
+        is_cloze_lt = (lt == "cloze") or ("克漏字" in sec_name or "克漏" in sec_name)
+        is_completion_lt = (lt == "word_bank") or ("文意選填" in sec_name or "選填" in sec_name)
+        is_translation_lt = (lt == "translation") or ("翻譯" in sec_name or "填空式翻譯" in sec_name)
+
+        rule_desc = f"【大題 {idx}】: {sec_name} (共 {sec_cnt} 題, 題型: {sec_type}, 配分: {scoring})\n"
+        if is_vocab_lt:
+            rule_desc += f"  - 📝 字彙題型特規: choices 必須為空陣列 `[]`。題目 question 提供英文句，目標單字呈現首尾字母與底線（如 \"r_____e\"）。\"answer\" 填入該單字完整拼寫。題目 section 欄位必須為 \"{sec_name}\"。\n"
+        elif is_cloze_lt:
+            rule_desc += f"  - 📝 克漏字題型特規: 這大題共有 {sec_cnt} 題。本大題第 1 題的 question 包含整篇挖空長文（挖空標記 `(1) _______` 到 `({sec_cnt}) _______`），choices 為第 1 個空格選項。本大題其餘第 2 到 {sec_cnt} 題，question 僅填寫題號（如 `(2)`），choices 則為對應題號選項。題目 section 欄位必須為 \"{sec_name}\"。\n"
+        elif is_completion_lt:
+            rule_desc += f"  - 📝 文意選填題型特規: 這大題共有 {sec_cnt} 題。本大題第 1 題的 question 開頭為單字庫 `Word Bank: A.單字A  B.單字B...` (正好 10 個英文字)，下方附整篇挖空長文（標記 `(1) _______` 到 `({sec_cnt}) _______`）。本大題其餘第 2 到 {sec_cnt} 題，question 僅填寫題號（如 `(2)`），choices 固定為 `A` 到 `J` 的 10 個選項。題目 section 欄位必須為 \"{sec_name}\"。\n"
+        elif is_translation_lt:
+            rule_desc += f"  - 📝 填空式翻譯題型特規: choices 必須為空陣列 `[]`。題目 question 給予中文段落與挖空英文 `(1) _______` 等，answer 填入正確英文字詞。題目 section 欄位必須為 \"{sec_name}\"。\n"
+        else:
+            if sec_type == "multiple_choice":
+                rule_desc += f"  - 📝 選擇題型特規: 提供 A, B, C, D 四個選項，answer 為選項字母。題目 section 欄位必須為 \"{sec_name}\"。\n"
+            else:
+                rule_desc += f"  - 📝 非選擇題型特規: choices 為空陣列 `[]`，answer 為正確解答。題目 section 欄位必須為 \"{sec_name}\"。\n"
+        
+        section_rules.append(rule_desc)
+        total_q += sec_cnt
+
+    rules_str = "\n".join(section_rules)
+    custom_requirements = style_json.get("custom_requirements", "")
+    custom_req_instructions = f"自訂限制要求: {custom_requirements}" if custom_requirements else ""
+    
+    textbook_context = _format_chunks(textbook_chunks, "課本內容")
+    past_exam_context = _format_chunks(past_exam_chunks, "考古題參考")
+
+    system_prompt = f"""你是一位台灣高中{subject_name}教師。請一次性產出包含所有大題、共計剛好 {total_q} 題的 JSON 完整試卷。
+請為每道題目的 "id" 欄位設定從 1 到 {total_q} 的遞增序號。
+
+【大題與題型規格說明】：
+{rules_str}
+
+【其他規範】：
+* 題目的 "section" 欄位必須設定為該題目對應的大題名稱（如 "{sections[0].get('section_name', '第一部分')}" 等）。
+* {custom_req_instructions}
+
+請嚴格遵守以下 JSON 輸出結構：
+{{
+  "questions": [
+    {{
+      "id": 1,
+      "unit_code": "{first_unit}",
+      "section": "大題名稱",
+      "question": "...",
+      "choices": [{{"key": "A", "text": "..."}}],
+      "answer": "A",
+      "explanation": "..."
+    }}
+  ]
+}}"""
+
+    user_prompt = f"""一次性生成整張高中{subject_name}科完整考卷。
+考試範圍：{units_str}
+考卷難度：{difficulty_desc}
+{textbook_context}
+{past_exam_context}
+"""
+    return system_prompt, user_prompt
