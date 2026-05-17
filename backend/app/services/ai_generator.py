@@ -57,7 +57,7 @@ async def generate_questions(
                 model_name=model_name,
                 generation_config=genai.GenerationConfig(
                     temperature=0.2,
-                    max_output_tokens=2048,
+                    max_output_tokens=8192,
                     response_mime_type="application/json",
                 ),
                 safety_settings=safety_settings
