@@ -94,5 +94,20 @@ async def generate_exam(req: ExamGenerateRequest):
             return exam_result
 
     except Exception as e:
+        error_msg = str(e)
         error_detail = traceback.format_exc()
-        raise HTTPException(status_code=500, detail=f"解封 Word 失敗：\n{error_detail}")
+        
+        # 智慧型金鑰與配額異常偵測
+        err_lower = error_msg.lower()
+        if any(term in err_lower for term in ["api key", "expired", "unauthorized", "quota", "limit", "suspended", "exhausted", "permission"]):
+            friendly_detail = (
+                "⚠️ 【AI 金鑰異常警告】\n\n"
+                "偵測到您的 Gemini API 金鑰已過期、被停權，或當日呼叫額度已全部用盡！\n\n"
+                "【建議解決方案】：\n"
+                "1. 請前往管理後台，在「API 金鑰設定」中移除失效的金鑰。\n"
+                "2. 插入一或多支全新且有效的 Gemini API 金鑰。\n"
+                "3. 系統將會無感加載並自動滿血恢復出題服務！"
+            )
+            raise HTTPException(status_code=400, detail=friendly_detail)
+            
+        raise HTTPException(status_code=500, detail=f"系統命題失敗：\n{error_detail}")
