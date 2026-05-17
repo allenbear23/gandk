@@ -90,6 +90,11 @@ class APIKeyRotator:
                 
             # 若所有金鑰都在冷卻中
             if shortest_wait is not None and shortest_wait > 0:
+                # 若等待時間過長（大於 8 秒），不要在 Web 請求中死等，直接拋出異常讓使用者更換金鑰！
+                if shortest_wait > 8.0:
+                    logger.error(f"🔥 所有 API 金鑰均在長冷卻中 (最短需等 {shortest_wait:.1f} 秒)。拒絕死等，直接熔斷！")
+                    raise RuntimeError(f"所有 API 金鑰均已耗盡或處於限制中，最短需要等待 {shortest_wait:.1f} 秒。請更換金鑰或稍後再試！")
+                
                 logger.info(f"⏳ 所有 API 金鑰均在冷卻限制中。將暫停等待最短金鑰解凍 {shortest_wait:.1f} 秒，防止崩潰...")
                 await asyncio.sleep(shortest_wait + 0.5)
                 continue
@@ -169,7 +174,8 @@ async def generate_questions(
                 
                 # 呼叫 API
                 response = await model.generate_content_async(
-                    f"{system_prompt}\n\n{user_prompt}"
+                    f"{system_prompt}\n\n{user_prompt}",
+                    request_options={"timeout": 15.0}
                 )
                 
                 raw_output = response.text
@@ -366,7 +372,10 @@ def _call_gemini_sync(system_prompt: str, user_prompt: str) -> str:
                 logger.info(f"🧪 同步分析風格：嘗試 {model_name} (使用金鑰 {key_rotator._index % num_keys + 1}/{num_keys})...")
                 genai.configure(api_key=active_key)
                 model = genai.GenerativeModel(model_name)
-                response = model.generate_content(f"{system_prompt}\n\n{user_prompt}")
+                response = model.generate_content(
+                    f"{system_prompt}\n\n{user_prompt}",
+                    request_options={"timeout": 15.0}
+                )
                 
                 # 成功了！
                 _best_working_model = model_name
