@@ -123,3 +123,15 @@ async def analyze_style_from_doc(subject_id: str, document_id: str):
         return {"status": "success", "style_prompt": style_prompt}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class StyleUpdate(BaseModel):
+    style_prompt: str
+
+@router.put("/{subject_id}/style", summary="更新科目的風格與 AI 要求")
+async def update_subject_style(subject_id: str, data: StyleUpdate):
+    try:
+        sb = get_supabase()
+        sb.table("subjects").update({"style_prompt": data.style_prompt}).eq("id", subject_id).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"更新失敗: {str(e)}")

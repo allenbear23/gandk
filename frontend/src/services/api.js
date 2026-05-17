@@ -96,5 +96,9 @@ export const examAPI = {
   analyzeStyle: async (subjectId, documentId) => {
     const res = await api.post(`/admin/subjects/${subjectId}/analyze-style-from-doc/${documentId}`);
     return res.data;
+  },
+  updateSubjectStyle: async (subjectId, stylePrompt) => {
+    const res = await api.put(`/admin/subjects/${subjectId}/style`, { style_prompt: stylePrompt });
+    return res.data;
   }
 };

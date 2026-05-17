@@ -132,7 +132,8 @@ async def generate_exam_by_sections(
             difficulty=difficulty,
             textbook_chunks=textbook_chunks,
             past_exam_chunks=past_exam_chunks,
-            layout_type=sec.get("layout_type", "")
+            layout_type=sec.get("layout_type", ""),
+            custom_requirements=style_json.get("custom_requirements", "")
         )
         
         # 嘗試呼叫 AI (含 429 緩退重試機制)

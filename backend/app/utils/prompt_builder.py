@@ -139,6 +139,7 @@ def build_exam_prompt_for_single_section(
     textbook_chunks: List[dict] = [],
     past_exam_chunks: List[dict] = [],
     layout_type: str = "",
+    custom_requirements: str = "",
 ) -> tuple[str, str]:
     """
     專為「單一大題」設計的超高擬真度命題 Prompt。
@@ -204,6 +205,14 @@ def build_exam_prompt_for_single_section(
   1. 每題的 "choices" 必須為空陣列 `[]`，"answer" 為該題的正確文字答案。
 """
 
+    # 注入使用者自定義的附加限制與要求
+    custom_req_instructions = ""
+    if custom_requirements:
+        custom_req_instructions = f"""
+* ⚠️【重要：出題附加限制與要求】
+  {custom_requirements}
+"""
+
     system_prompt = f"""你是一位擁有 20 年經驗的台灣高中{subject_name}科名師。
 請根據提供的素材，出一份正式的、符合高中段考標準的 JSON 格式考卷。
 
@@ -213,6 +222,7 @@ def build_exam_prompt_for_single_section(
 - 配分說明：{scoring}
 - 預計題數：此 API 呼叫必須且只能產出剛好 {sec_cnt} 道題目，題號必須為 1 到 {sec_cnt}！
 {special_section_instructions}
+{custom_req_instructions}
 
 ## 命題與格式規範
 1. **語氣**：使用專業的學術命題風格，完全克隆台灣高中考卷的排版與表達方式。
