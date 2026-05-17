@@ -22,7 +22,7 @@ class UnitCreate(BaseModel):
     unit_code: str
     description: Optional[str] = ""
 
-@router.get("/", summary="取得所有科目")
+@router.get("", summary="取得所有科目")
 async def get_subjects():
     try:
         sb = get_supabase()
@@ -32,7 +32,7 @@ async def get_subjects():
         logger.error(f"取得科目失敗: {e}")
         return {"subjects": [], "error": str(e)}
 
-@router.post("/", summary="建立新科目")
+@router.post("", summary="建立新科目")
 async def create_subject(data: SubjectCreate):
     try:
         sb = get_supabase()
