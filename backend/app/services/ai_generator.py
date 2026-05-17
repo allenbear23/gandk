@@ -326,15 +326,54 @@ async def generate_exam_by_sections(
     return {"questions": all_questions}
 
 def _call_gemini_sync(system_prompt: str, user_prompt: str) -> str:
-    """同步呼叫保底"""
+    """同步呼叫保底，支援多金鑰自動輪轉與退避重試"""
     global _best_working_model
     key_rotator.reload_keys()
-    active_key = key_rotator.get_current_key()
-    genai.configure(api_key=active_key)
-    model_name = _best_working_model or "models/gemini-2.0-flash-lite"
-    model = genai.GenerativeModel(model_name)
-    response = model.generate_content(f"{system_prompt}\n\n{user_prompt}")
-    return response.text
+    num_keys = len(key_rotator.keys) or 1
+    
+    import time
+    
+    candidate_models = [
+        _best_working_model or "models/gemini-2.0-flash-lite",
+        "models/gemini-2.0-flash",
+        "models/gemini-2.5-flash-lite",
+        "models/gemini-2.5-flash",
+    ]
+    
+    last_err = None
+    for model_name in candidate_models:
+        for attempt in range(num_keys):
+            active_key = key_rotator.get_current_key()
+            try:
+                logger.info(f"🧪 同步分析風格：嘗試 {model_name} (使用金鑰 {key_rotator._index % num_keys + 1}/{num_keys})...")
+                genai.configure(api_key=active_key)
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(f"{system_prompt}\n\n{user_prompt}")
+                
+                # 成功了！
+                _best_working_model = model_name
+                return response.text
+            except Exception as e:
+                last_err = e
+                err_msg = str(e)
+                logger.warning(f"❌ 同步分析失敗 (模型 {model_name}, 金鑰嘗試 {attempt+1}/{num_keys}): {err_msg[:150]}")
+                
+                if "429" in err_msg or "ResourceExhausted" in err_msg or "quota" in err_msg.lower():
+                    cooldown_sec = 50.0
+                    try:
+                        if "retry in" in err_msg:
+                            parts = err_msg.split("retry in")
+                            sec_str = parts[1].strip().split("s")[0].strip()
+                            cooldown_sec = float(sec_str) + 2.0
+                    except Exception:
+                        pass
+                    key_rotator.mark_cooldown(active_key, duration=cooldown_sec)
+                    time.sleep(2)
+                
+                if num_keys > 1:
+                    key_rotator.rotate()
+                    
+    raise last_err
 
 async def list_available_models():
     """保留診斷端點"""
