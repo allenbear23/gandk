@@ -31,16 +31,13 @@ async def generate_questions(
         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
     }
 
-    # 候選名單：包含 user 可能擁有的所有免費/付費模型
+    # 候選名單：包含 user 經過 API 查詢 100% 存在且支援的 Gemini 2.0 / 2.5 官方模型清單
     candidate_models = [
         "models/gemini-2.0-flash-lite",
         "models/gemini-2.5-flash",
         "models/gemini-2.0-flash",
-        "models/gemini-1.5-flash",
-        "gemini-2.0-flash-lite",
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash"
+        "models/gemini-2.5-flash-lite",
+        "models/gemini-2.5-pro",
     ]
     
     # 如果已經知道哪個能用，就先插隊到第一名
