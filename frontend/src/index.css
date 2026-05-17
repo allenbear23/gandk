@@ -2,6 +2,226 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900;
+    font-family: MingLiU, PMingLiU, DFKai-SB, "Microsoft JhengHei", Arial, Tahoma, sans-serif !important;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    text-rendering: geometricPrecision;
+    background-color: #d8d8d8 !important;
+    color: #000000 !important;
   }
+
+  /* Jagged inputs and select fields */
+  select, input, button, textarea {
+    font-family: MingLiU, PMingLiU, DFKai-SB, "Microsoft JhengHei", Arial, Tahoma, sans-serif !important;
+  }
+}
+
+/* 華國美學風格公用類別 */
+
+/* 1. 經典立體浮雕邊框 (Win95/WinXP) */
+.roc-bevel-outset {
+  border: 3px outset #ffffff !important;
+  background-color: #d4d0c8 !important;
+  box-shadow: inset 1px 1px 0px #ffffff, inset -1px -1px 0px #808080, 2px 2px 5px rgba(0,0,0,0.3) !important;
+  border-radius: 0px !important;
+}
+
+.roc-bevel-inset {
+  border: 3px inset #ffffff !important;
+  background-color: #ffffff !important;
+  box-shadow: inset 1px 1px 1px #808080, inset -1px -1px 0px #ffffff !important;
+  border-radius: 0px !important;
+}
+
+/* 2. 經典亮面立體按鈕 (Glossy Beveled Button) */
+.roc-btn-glossy {
+  font-family: DFKai-SB, "Microsoft JhengHei", sans-serif !important;
+  font-weight: bold !important;
+  color: #ffffff !important;
+  text-shadow: 1px 1px 1px #000000 !important;
+  border: 3px outset #ffffff !important;
+  border-radius: 0px !important;
+  padding: 8px 16px !important;
+  cursor: pointer !important;
+  transition: none !important;
+  text-align: center !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* 藍色按鈕 (中華民國藍) */
+.roc-btn-primary {
+  background: linear-gradient(180deg, #0056b3 0%, #002288 50%, #001166 100%) !important;
+}
+.roc-btn-primary:active {
+  border-style: inset !important;
+  background: linear-gradient(180deg, #001166 0%, #002288 50%, #0056b3 100%) !important;
+}
+
+/* 紅色按鈕 (警示紅) */
+.roc-btn-danger {
+  background: linear-gradient(180deg, #d9534f 0%, #c9302c 50%, #ac2925 100%) !important;
+}
+.roc-btn-danger:active {
+  border-style: inset !important;
+  background: linear-gradient(180deg, #ac2925 0%, #c9302c 50%, #d9534f 100%) !important;
+}
+
+/* 綠色按鈕 (成功綠) */
+.roc-btn-success {
+  background: linear-gradient(180deg, #5cb85c 0%, #4cae4c 50%, #398439 100%) !important;
+}
+.roc-btn-success:active {
+  border-style: inset !important;
+  background: linear-gradient(180deg, #398439 0%, #4cae4c 50%, #5cb85c 100%) !important;
+}
+
+/* 黃色按鈕 (警示黃) */
+.roc-btn-warning {
+  background: linear-gradient(180deg, #f0ad4e 0%, #ec971f 50%, #d58512 100%) !important;
+  color: #000000 !important;
+  text-shadow: none !important;
+}
+.roc-btn-warning:active {
+  border-style: inset !important;
+  background: linear-gradient(180deg, #d58512 0%, #ec971f 50%, #f0ad4e 100%) !important;
+}
+
+/* 3. WordArt 文字藝術師效果 */
+.roc-wordart-container {
+  display: inline-block;
+  position: relative;
+  padding: 10px 0;
+  text-align: center;
+}
+
+.roc-wordart-main {
+  font-family: DFKai-SB, PMingLiU, "Microsoft JhengHei", sans-serif !important;
+  font-size: 2.8rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 4px !important;
+  background: linear-gradient(180deg, #ff0000 0%, #ff8800 30%, #ffff00 60%, #00ff00 80%, #0000ff 100%);
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  transform: skewX(-12deg) scaleY(1.2) !important;
+  filter: drop-shadow(2px 2px 0px #000000) drop-shadow(4px 4px 0px #0000ff) !important;
+  display: block;
+}
+
+.roc-wordart-sub {
+  font-family: DFKai-SB, "Microsoft JhengHei", sans-serif !important;
+  font-size: 1.8rem !important;
+  font-weight: bold !important;
+  color: #002d62 !important;
+  text-shadow: 1px 1px 0px #ffffff, 2px 2px 0px #0056b3, -1px -1px 0px #ffffff !important;
+  transform: skewX(-8deg) scaleY(1.1) !important;
+}
+
+/* 4. 跑馬燈與公告樣式 */
+.roc-marquee-container {
+  background-color: #ff0000 !important;
+  border: 3px double #ffff00 !important;
+  color: #ffff00 !important;
+  font-weight: bold !important;
+  padding: 6px !important;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: DFKai-SB, "Microsoft JhengHei", sans-serif !important;
+  font-size: 1.1rem !important;
+}
+
+.roc-marquee-text {
+  display: inline-block;
+  padding-left: 100%;
+  animation: roc-marquee 25s linear infinite;
+}
+
+@keyframes roc-marquee {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-100%, 0, 0); }
+}
+
+/* 5. 行政雙實線邊框 */
+.roc-double-border {
+  border: 4px double #002d62 !important;
+  background-color: #f7f7f7 !important;
+  padding: 10px !important;
+  border-radius: 0px !important;
+}
+
+/* 6. 中華民國藍橫幅 */
+.roc-navbar-blue {
+  background: linear-gradient(90deg, #002d62 0%, #0056b3 50%, #002d62 100%) !important;
+  border-bottom: 4px solid #cc0000 !important;
+  color: #ffffff !important;
+}
+
+/* 7. 表格行政化 */
+.roc-table-classic {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  border: 3px solid #002d62 !important;
+}
+
+.roc-table-classic th {
+  background-color: #002d62 !important;
+  color: #ffffff !important;
+  font-family: DFKai-SB, sans-serif !important;
+  font-weight: bold !important;
+  font-size: 1rem !important;
+  border: 1px solid #000000 !important;
+  padding: 8px !important;
+  text-align: center !important;
+}
+
+.roc-table-classic td {
+  border: 1px solid #000000 !important;
+  padding: 8px !important;
+  font-size: 0.95rem !important;
+  background-color: #ffffff !important;
+}
+
+.roc-table-classic tr:nth-child(even) td {
+  background-color: #eef4fa !important;
+}
+
+.roc-table-classic tr:hover td {
+  background-color: #ffffcc !important; /* 早期網頁黃色高亮 hover */
+}
+
+/* 8. 同色微差公告框 (Same-Color Drift) */
+.roc-notice-drift {
+  background: hsl(52, 94%, 78%) !important;
+  border: 2px solid hsl(52, 96%, 60%) !important;
+  padding: 10px !important;
+}
+
+.roc-notice-drift-inner {
+  background: hsl(52, 96%, 74%) !important;
+  border: 1px dashed hsl(52, 96%, 50%) !important;
+  padding: 8px !important;
+  margin-top: 6px !important;
+}
+
+/* 9. 新聞公告帶 (最新消息專用) */
+.roc-announcement-belt {
+  background-color: #ffffcc !important;
+  border-left: 8px solid #ff0000 !important;
+  border-top: 1px solid #ddd;
+  border-right: 1px solid #ddd;
+  border-bottom: 1px solid #ddd;
+  padding: 8px 12px !important;
+  font-size: 0.9rem !important;
+  font-weight: bold !important;
+  color: #cc0000 !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* 10. 全形標記 */
+.roc-bullet::before {
+  content: "◎ " !important;
+  color: #cc0000 !important;
+  font-weight: bold !important;
 }
