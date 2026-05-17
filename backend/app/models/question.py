@@ -27,25 +27,18 @@ class DocumentStatus(str, Enum):
 # ── 題目相關 ──────────────────────────────────────────────────
 
 class Choice(BaseModel):
-    key: str = Field(..., pattern="^[ABCD]$")
+    key: str
     text: str
 
 class Question(BaseModel):
     id: int
     question: str
-    choices: List[Choice] = Field(..., min_length=4, max_length=4)
-    answer: str = Field(..., pattern="^[ABCD]$")
+    choices: List[Choice] = Field(default_factory=list)
+    answer: str
     explanation: str
     unit_code: Optional[str] = "1-1"
     section: Optional[str] = None
     difficulty: int = Field(default=3, ge=1, le=5)
-
-    @field_validator("choices")
-    @classmethod
-    def validate_choice_keys(cls, v: list) -> list:
-        keys = {c.key for c in v}
-        assert keys == {"A", "B", "C", "D"}, "選項必須包含完整的 A、B、C、D"
-        return v
 
 
 class ExamResult(BaseModel):

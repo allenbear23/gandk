@@ -152,66 +152,94 @@ export default function QuizPage() {
               </div>
             </div>
 
-            {/* 選項選擇列表 */}
-            <div className="space-y-3">
-              <div className="text-xs font-bold text-gray-700 pl-1">
-                【請由下列選項中點選唯一正確答案】：
-              </div>
-              
-              {currentQ.choices.map((choice) => {
-                const isSelected = userAnswers[currentIndex] === choice.key;
-                const isCorrectAns = currentQ.answer === choice.key;
+            {/* 選項選擇列表 / 填空題輸入框 */}
+            {currentQ.choices && currentQ.choices.length > 0 ? (
+              <div className="space-y-3">
+                <div className="text-xs font-bold text-gray-700 pl-1">
+                  【請由下列選項中點選唯一正確答案】：
+                </div>
                 
-                let stateClass = "bg-white border-gray-400 text-black hover:bg-yellow-50";
-                let badgeClass = "bg-gray-200 text-black border border-gray-500";
-                
-                if (isAnswered) {
-                  if (isCorrectAns) {
-                    stateClass = "bg-green-100 text-green-950 border-green-600 font-bold ring-2 ring-green-600 shadow-inner";
-                    badgeClass = "bg-green-600 text-white border border-green-700";
-                  } else if (isSelected) {
-                    stateClass = "bg-red-100 text-red-950 border-red-600 font-bold ring-2 ring-red-600 shadow-inner";
-                    badgeClass = "bg-red-600 text-white border border-red-700";
-                  } else {
-                    stateClass = "bg-white border-gray-300 text-gray-400 opacity-60";
-                    badgeClass = "bg-gray-100 text-gray-300 border border-gray-200";
+                {currentQ.choices.map((choice) => {
+                  const isSelected = userAnswers[currentIndex] === choice.key;
+                  const isCorrectAns = currentQ.answer === choice.key;
+                  
+                  let stateClass = "bg-white border-gray-400 text-black hover:bg-yellow-50";
+                  let badgeClass = "bg-gray-200 text-black border border-gray-500";
+                  
+                  if (isAnswered) {
+                    if (isCorrectAns) {
+                      stateClass = "bg-green-100 text-green-950 border-green-600 font-bold ring-2 ring-green-600 shadow-inner";
+                      badgeClass = "bg-green-600 text-white border border-green-700";
+                    } else if (isSelected) {
+                      stateClass = "bg-red-100 text-red-950 border-red-600 font-bold ring-2 ring-red-600 shadow-inner";
+                      badgeClass = "bg-red-600 text-white border border-red-700";
+                    } else {
+                      stateClass = "bg-white border-gray-300 text-gray-400 opacity-60";
+                      badgeClass = "bg-gray-100 text-gray-300 border border-gray-200";
+                    }
                   }
-                }
 
-                return (
-                  <button
-                    key={choice.key}
-                    onClick={() => handleSelect(choice.key)}
-                    disabled={isAnswered}
-                    className={`w-full text-left p-4 border-2 transition-none flex items-center relative overflow-hidden ${
-                      isAnswered ? '' : 'active:translate-y-[1px] active:translate-x-[1px]'
-                    } ${stateClass}`}
-                    style={{ borderRadius: '0px' }}
+                  return (
+                    <button
+                      key={choice.key}
+                      onClick={() => handleSelect(choice.key)}
+                      disabled={isAnswered}
+                      className={`w-full text-left p-4 border-2 transition-none flex items-center relative overflow-hidden ${
+                        isAnswered ? '' : 'active:translate-y-[1px] active:translate-x-[1px]'
+                      } ${stateClass}`}
+                      style={{ borderRadius: '0px' }}
+                    >
+                      {/* 選項編號 */}
+                      <div className={`flex-shrink-0 w-8 h-8 rounded-none flex items-center justify-center font-black text-sm mr-4 ${badgeClass}`}>
+                        {choice.key}
+                      </div>
+                      
+                      <span className="text-base sm:text-lg flex-1 leading-normal font-mono pr-8">
+                        {choice.text}
+                      </span>
+
+                      {/* 勾叉反饋圖示 */}
+                      {isAnswered && isCorrectAns && (
+                        <div className="absolute right-4 text-green-600 flex items-center font-bold text-xs font-mono">
+                          <CheckCircle2 className="w-5 h-5 mr-1" /> 正確
+                        </div>
+                      )}
+                      {isAnswered && isSelected && !isCorrectAns && (
+                        <div className="absolute right-4 text-red-600 flex items-center font-bold text-xs font-mono">
+                          <XCircle className="w-5 h-5 mr-1" /> 錯誤
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="roc-bevel-outset p-6 bg-white space-y-4">
+                <div className="text-xs font-bold text-[#cc0000] font-mono">
+                  ※ 本題為【非選擇題 / 填空或翻譯題】，請於紙上作答，或在下方輸入作答內容：
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="請在此處輸入您的模擬作答解答..."
+                  className="w-full p-3 border-2 border-gray-400 bg-yellow-50 text-black font-mono text-base focus:outline-none focus:border-[#002d62]"
+                  style={{ borderRadius: '0px' }}
+                  disabled={isAnswered}
+                  value={userAnswers[currentIndex] || ""}
+                  onChange={(e) => setUserAnswers(prev => ({ ...prev, [currentIndex]: e.target.value }))}
+                />
+                {!isAnswered && (
+                  <button 
+                    onClick={() => {
+                      setUserAnswers(prev => ({ ...prev, [currentIndex]: userAnswers[currentIndex] || "已完成作答" }));
+                      setShowExplanation(prev => ({ ...prev, [currentIndex]: true }));
+                    }}
+                    className="roc-btn-glossy roc-btn-primary w-full py-2 font-bold text-sm"
                   >
-                    {/* 選項編號 */}
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-none flex items-center justify-center font-black text-sm mr-4 ${badgeClass}`}>
-                      {choice.key}
-                    </div>
-                    
-                    <span className="text-base sm:text-lg flex-1 leading-normal font-mono pr-8">
-                      {choice.text}
-                    </span>
-
-                    {/* 勾叉反饋圖示 */}
-                    {isAnswered && isCorrectAns && (
-                      <div className="absolute right-4 text-green-600 flex items-center font-bold text-xs font-mono">
-                        <CheckCircle2 className="w-5 h-5 mr-1" /> 正確
-                      </div>
-                    )}
-                    {isAnswered && isSelected && !isCorrectAns && (
-                      <div className="absolute right-4 text-red-600 flex items-center font-bold text-xs font-mono">
-                        <XCircle className="w-5 h-5 mr-1" /> 錯誤
-                      </div>
-                    )}
+                    ★ 送出答案，觀看 AI 詳解 ★
                   </button>
-                );
-              })}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* AI 詳解 (Bevel 相同色微差 notice-drift) */}
             {showExplanation[currentIndex] && (
