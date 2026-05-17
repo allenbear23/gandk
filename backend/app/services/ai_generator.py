@@ -31,13 +31,13 @@ async def generate_questions(
         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
     }
 
-    # 候選名單：包含 user 經過 API 查詢 100% 存在且支援的 Gemini 2.0 / 2.5 官方模型清單
+    # 候選名單：包含 Free Tier 友善的 Gemini 2.0 / 2.5 官方 Flash 與 Lite 模型，排除 quota=0 的 Pro 模型
     candidate_models = [
-        "models/gemini-2.0-flash-lite",
-        "models/gemini-2.5-flash",
         "models/gemini-2.0-flash",
+        "models/gemini-2.5-flash",
+        "models/gemini-2.0-flash-lite",
         "models/gemini-2.5-flash-lite",
-        "models/gemini-2.5-pro",
+        "models/gemini-flash-latest",
     ]
     
     # 如果已經知道哪個能用，就先插隊到第一名
@@ -114,6 +114,9 @@ async def generate_exam_by_sections(
         
     logger.info(f"🔮 開始分大題平行生成流程。大題數: {len(sections)}，預計總題數: {total_expected}")
     
+    # 建立信號量以限制同時發送的 API 請求數為 2，防止瞬間衝撞 Free Tier 的 15 RPM 限制
+    sem = asyncio.Semaphore(2)
+    
     async def generate_single_sec(sec_idx, sec):
         sec_name = sec.get("section_name", f"第 {sec_idx} 大題")
         sec_cnt = sec.get("question_count", 1)
@@ -136,26 +139,28 @@ async def generate_exam_by_sections(
             custom_requirements=style_json.get("custom_requirements", "")
         )
         
-        # 嘗試呼叫 AI (含 429 緩退重試機制)
+        # 嘗試呼叫 AI (含 429 緩退重試機制與 Semaphore 併發保護)
         res_data = None
         retries = 3
         for attempt in range(retries):
             try:
-                # 為了避免平行呼叫瞬間衝撞，加入微小隨機延遲 (0 到 0.8秒)
-                await asyncio.sleep(random.uniform(0.0, 0.8))
-                
-                res_data = await generate_questions(
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    target_count=sec_cnt,
-                    unit_codes=unit_codes
-                )
+                # 使用信號量限制併發
+                async with sem:
+                    # 為了避免 API 重疊發送，隨機延遲 0.0 到 0.5 秒
+                    await asyncio.sleep(random.uniform(0.0, 0.5))
+                    res_data = await generate_questions(
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        target_count=sec_cnt,
+                        unit_codes=unit_codes
+                    )
                 break
             except Exception as e:
                 logger.warning(f"⚠️ 大題 [{sec_name}] 嘗試 {attempt+1} 失敗: {e}")
                 if attempt == retries - 1:
                     raise e
-                await asyncio.sleep(3 + attempt * 2) # 重試漸進式退避
+                # 遇到 429 或其他錯誤時，做漸進式指數退避等待
+                await asyncio.sleep(4 + attempt * 3)
                 
         sec_questions = res_data.get("questions", [])
         if not sec_questions and isinstance(res_data, list):
