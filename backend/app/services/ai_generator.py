@@ -188,15 +188,14 @@ async def generate_questions(
                 err_msg = str(e)
                 logger.warning(f"❌ 模型 {model_name} 失敗 (金鑰 {key_rotator._index % num_keys + 1} 嘗試 {key_attempt+1}/{num_keys}): {err_msg[:150]}")
                 
-                # 遇到 Quota Exhausted / 429 / Rate Limit 等情況，立刻標記冷卻並輪轉
                 if "429" in err_msg or "ResourceExhausted" in err_msg or "quota" in err_msg.lower():
                     # 嘗試從 Google 錯誤訊息中解析具體的冷卻秒數（例如: "Please retry in 46.610192564s."）
-                    cooldown_sec = 50.0
+                    cooldown_sec = 5.0  # 預設大幅縮短為 5.0 秒，避免被長時間冰凍！
                     try:
                         if "retry in" in err_msg:
                             parts = err_msg.split("retry in")
                             sec_str = parts[1].strip().split("s")[0].strip()
-                            cooldown_sec = float(sec_str) + 2.0 # 加上 2 秒保險緩衝
+                            cooldown_sec = float(sec_str) + 1.0 # 加上 1 秒保險緩衝
                     except Exception:
                         pass
                     
@@ -240,8 +239,12 @@ async def generate_exam_by_sections(
         
     logger.info(f"🔮 開始分大題平行生成流程。大題數: {len(sections)}，預計總題數: {total_expected}")
     
-    # 建立信號量以限制同時發送的 API 請求數為 2，防止瞬間衝撞 Free Tier 的 15 RPM 限制
-    sem = asyncio.Semaphore(2)
+    # 動態調整併發限制：若只有 1 支金鑰，限制併發為 1（順序生成），避免觸發 Google 的併發/次數限制。
+    # 若有多支金鑰，則允許較高的併發度（金鑰個數，最多 3），以金鑰分流達到極速生成。
+    num_keys = len(key_rotator.keys) or 1
+    max_concurrency = 1 if num_keys == 1 else min(num_keys, 3)
+    sem = asyncio.Semaphore(max_concurrency)
+    logger.info(f"📊 根據金鑰數量 ({num_keys} 支)，動態配置併發限制 Semaphore({max_concurrency})")
     
     async def generate_single_sec(sec_idx, sec):
         sec_name = sec.get("section_name", f"第 {sec_idx} 大題")
@@ -272,8 +275,9 @@ async def generate_exam_by_sections(
             try:
                 # 使用信號量限制併發
                 async with sem:
-                    # 為了避免 API 重疊發送，隨機延遲 0.0 到 0.5 秒
-                    await asyncio.sleep(random.uniform(0.0, 0.5))
+                    # 避免 API 重疊發送（若併發為 1 則小延遲，多併發隨機延遲）
+                    delay = 0.1 if max_concurrency == 1 else random.uniform(0.2, 0.8)
+                    await asyncio.sleep(delay)
                     res_data = await generate_questions(
                         system_prompt=system_prompt,
                         user_prompt=user_prompt,
@@ -286,7 +290,7 @@ async def generate_exam_by_sections(
                 if attempt == retries - 1:
                     raise e
                 # 遇到 429 或其他錯誤時，做漸進式指數退避等待
-                await asyncio.sleep(4 + attempt * 3)
+                await asyncio.sleep(3 + attempt * 2)
                 
         sec_questions = res_data.get("questions", [])
         if not sec_questions and isinstance(res_data, list):
@@ -359,12 +363,12 @@ def _call_gemini_sync(system_prompt: str, user_prompt: str) -> str:
                 logger.warning(f"❌ 同步分析失敗 (模型 {model_name}, 金鑰嘗試 {attempt+1}/{num_keys}): {err_msg[:150]}")
                 
                 if "429" in err_msg or "ResourceExhausted" in err_msg or "quota" in err_msg.lower():
-                    cooldown_sec = 50.0
+                    cooldown_sec = 5.0  # 預設大幅縮短為 5.0 秒，避免被長時間冰凍！
                     try:
                         if "retry in" in err_msg:
                             parts = err_msg.split("retry in")
                             sec_str = parts[1].strip().split("s")[0].strip()
-                            cooldown_sec = float(sec_str) + 2.0
+                            cooldown_sec = float(sec_str) + 1.0
                     except Exception:
                         pass
                     key_rotator.mark_cooldown(active_key, duration=cooldown_sec)
