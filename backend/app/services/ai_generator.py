@@ -9,6 +9,50 @@ from app.utils.json_validator import extract_and_validate_json
 
 logger = logging.getLogger(__name__)
 
+MODEL_OUTPUT_TOKEN_LIMITS = {
+    "models/gemini-2.5-flash": 32768,
+    "models/gemini-2.5-flash-lite": 32768,
+    "models/gemini-flash-latest": 16384,
+    "models/gemini-2.0-flash": 8192,
+    "models/gemini-2.0-flash-lite": 8192,
+}
+
+
+class TokenBudgetError(RuntimeError):
+    """Raised when the model output is truncated or too small for the request."""
+
+
+def _estimate_output_tokens(target_count: int) -> int:
+    # Exam questions are verbose JSON. Reserve enough room for long stems,
+    # choices, answers, explanations, and section metadata.
+    return min(32768, max(4096, target_count * 650 + 1200))
+
+
+def _is_token_budget_error(err_msg: str) -> bool:
+    err_lower = err_msg.lower()
+    token_terms = [
+        "max_tokens",
+        "max output tokens",
+        "maximum output",
+        "finish_reason: max_tokens",
+        "token",
+        "截斷",
+        "truncated",
+    ]
+    return any(term in err_lower for term in token_terms)
+
+
+def _response_was_truncated(response) -> bool:
+    try:
+        candidates = getattr(response, "candidates", None) or []
+        if not candidates:
+            return False
+        finish_reason = getattr(candidates[0], "finish_reason", "")
+        return "MAX_TOKENS" in str(finish_reason).upper()
+    except Exception:
+        return False
+
+
 class APIKeyRotator:
     def __init__(self):
         self.keys = []
@@ -120,6 +164,7 @@ async def generate_questions(
     target_count: int,
     unit_codes: List[str],
     max_retries: int = 0,
+    max_output_tokens: Optional[int] = None,
 ) -> dict:
     """使用多重保底嘗試法呼叫 Gemini，支援多金鑰自動輪轉與多模型容錯機制"""
     global _best_working_model
@@ -134,11 +179,11 @@ async def generate_questions(
 
     # 候選名單：包含 Free Tier 友善的 Gemini 2.0 / 2.5 官方 Flash 與 Lite 模型，排除 quota=0 的 Pro 模型
     candidate_models = [
-        "models/gemini-2.0-flash",
         "models/gemini-2.5-flash",
-        "models/gemini-2.0-flash-lite",
         "models/gemini-2.5-flash-lite",
         "models/gemini-flash-latest",
+        "models/gemini-2.0-flash",
+        "models/gemini-2.0-flash-lite",
     ]
     
     # 如果已經知道哪個能用，就先插隊到第一名
@@ -151,8 +196,13 @@ async def generate_questions(
     # 每次命題前重新加載最新的 API Key 設置（實現免重啟動態載入）
     key_rotator.reload_keys()
     num_keys = len(key_rotator.keys) or 1
+    requested_output_tokens = max_output_tokens or _estimate_output_tokens(target_count)
 
     for model_name in candidate_models:
+        model_output_tokens = min(
+            requested_output_tokens,
+            MODEL_OUTPUT_TOKEN_LIMITS.get(model_name, 8192),
+        )
         # 對於每一個模型，我們會對所有已配置的 API 金鑰進行輪轉嘗試
         for key_attempt in range(num_keys):
             active_key = await key_rotator.get_available_key_with_backoff()
@@ -166,7 +216,7 @@ async def generate_questions(
                     model_name=model_name,
                     generation_config=genai.GenerationConfig(
                         temperature=0.2,
-                        max_output_tokens=8192,
+                        max_output_tokens=model_output_tokens,
                         response_mime_type="application/json",
                     ),
                     safety_settings=safety_settings
@@ -178,8 +228,15 @@ async def generate_questions(
                     request_options={"timeout": 15.0}
                 )
                 
+                if _response_was_truncated(response):
+                    raise TokenBudgetError(
+                        f"模型輸出因 token 上限被截斷（{model_name}, max_output_tokens={model_output_tokens}）"
+                    )
+
                 raw_output = response.text
                 data = extract_and_validate_json(raw_output)
+                if data is None:
+                    raise TokenBudgetError("模型輸出不是完整 JSON，可能因 token 不足被截斷")
                 
                 # 成功了！記住這個模型
                 _best_working_model = model_name
@@ -222,6 +279,9 @@ async def generate_questions(
 
                 if num_keys > 1:
                     key_rotator.rotate()
+
+                if _is_token_budget_error(err_msg):
+                    break
                 
                 # 如果已經嘗試完所有金鑰，就跳出輪轉，嘗試下一個模型
                 if key_attempt == num_keys - 1:
@@ -253,17 +313,22 @@ async def generate_exam_in_single_call(
     
     total_expected = sum(sec.get("question_count", 1) for sec in sections)
     
-    # 如果總題數大於 22 題，在單次呼叫模式下等比例縮小，防止 Output Token (8,192) 被截斷！
-    max_safe_questions = 22
-    if total_expected > max_safe_questions:
-        ratio = max_safe_questions / total_expected
-        logger.info(f"⚠️ [單次呼叫安全防護] 預計總題數 {total_expected} 超過安全上限 {max_safe_questions}。等比例縮放題數（比例: {ratio:.2f}）...")
-        for sec in sections:
-            orig_cnt = sec.get("question_count", 1)
-            new_cnt = max(1, int(orig_cnt * ratio))
-            sec["question_count"] = new_cnt
-        # 更新縮放後的總題數
-        total_expected = sum(sec.get("question_count", 1) for sec in sections)
+    # 單次呼叫只適合中小型考卷。題量過大時改走分大題/分批生成，
+    # 保留使用者要求的題數，不再偷偷等比例縮減。
+    max_single_call_questions = 18
+    if total_expected > max_single_call_questions:
+        logger.info(
+            f"⚠️ [Token 防護] 預計總題數 {total_expected} 超過單次呼叫安全上限 "
+            f"{max_single_call_questions}，自動改用分大題/分批生成以避免輸出截斷。"
+        )
+        return await generate_exam_by_sections(
+            subject_name=subject_name,
+            unit_codes=unit_codes,
+            style_json=style_json,
+            difficulty=difficulty,
+            textbook_chunks=textbook_chunks,
+            past_exam_chunks=past_exam_chunks,
+        )
         
     system_prompt, user_prompt = build_mega_exam_prompt(
         subject_name=subject_name,
@@ -276,12 +341,23 @@ async def generate_exam_in_single_call(
     
     logger.info(f"⚡ [極致省電模式] 開始單次 API 命題，預計生成 {total_expected} 題...")
     
-    res_data = await generate_questions(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        target_count=total_expected,
-        unit_codes=unit_codes
-    )
+    try:
+        res_data = await generate_questions(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            target_count=total_expected,
+            unit_codes=unit_codes
+        )
+    except TokenBudgetError:
+        logger.info("⚠️ 單次呼叫遭遇 token 截斷，改用分大題/分批生成重試。")
+        return await generate_exam_by_sections(
+            subject_name=subject_name,
+            unit_codes=unit_codes,
+            style_json=style_json,
+            difficulty=difficulty,
+            textbook_chunks=textbook_chunks,
+            past_exam_chunks=past_exam_chunks,
+        )
     
     # 全局 ID 重排，確保 id 遞增
     all_questions = res_data.get("questions", [])
@@ -336,6 +412,22 @@ async def generate_exam_by_sections(
     max_concurrency = 1 if num_keys == 1 else min(num_keys, 3)
     sem = asyncio.Semaphore(max_concurrency)
     logger.info(f"📊 根據金鑰數量 ({num_keys} 支)，動態配置併發限制 Semaphore({max_concurrency})")
+
+    def should_split_section(sec: dict) -> bool:
+        sec_name = sec.get("section_name", "")
+        layout_type = (sec.get("layout_type", "") or "").lower()
+        joined = f"{layout_type} {sec_name}"
+        contiguous_layout_terms = ["cloze", "word_bank", "克漏", "文意選填", "選填"]
+        return not any(term in joined for term in contiguous_layout_terms)
+
+    def split_count(total: int, batch_size: int = 8) -> list[int]:
+        batches = []
+        remaining = total
+        while remaining > 0:
+            current = min(batch_size, remaining)
+            batches.append(current)
+            remaining -= current
+        return batches
     
     async def generate_single_sec(sec_idx, sec):
         sec_name = sec.get("section_name", f"第 {sec_idx} 大題")
@@ -344,51 +436,79 @@ async def generate_exam_by_sections(
         scoring = sec.get("scoring_rule", "")
         
         logger.info(f"🛫 [大題平行啟動] {sec_name} (預計 {sec_cnt} 題)...")
-        
-        system_prompt, user_prompt = build_exam_prompt_for_single_section(
-            subject_name=subject_name,
-            unit_codes=unit_codes,
-            sec_name=sec_name,
-            sec_cnt=sec_cnt,
-            sec_type=sec_type,
-            scoring=scoring,
-            difficulty=difficulty,
-            textbook_chunks=textbook_chunks,
-            past_exam_chunks=past_exam_chunks,
-            layout_type=sec.get("layout_type", ""),
-            custom_requirements=style_json.get("custom_requirements", "")
-        )
-        
-        # 嘗試呼叫 AI (含 429 緩退重試機制與 Semaphore 併發保護)
-        res_data = None
-        retries = 2 # 縮減為最多重試 2 次即可，內部已有多模型防護
-        for attempt in range(retries):
-            try:
-                # 使用信號量限制併發
-                async with sem:
-                    # 避免 API 重疊發送（若併發為 1 則小延遲，多併發隨機延遲）
-                    delay = 0.1 if max_concurrency == 1 else random.uniform(0.2, 0.8)
-                    await asyncio.sleep(delay)
-                    res_data = await generate_questions(
-                        system_prompt=system_prompt,
-                        user_prompt=user_prompt,
-                        target_count=sec_cnt,
-                        unit_codes=unit_codes
-                    )
-                break
-            except Exception as e:
-                logger.warning(f"⚠️ 大題 [{sec_name}] 嘗試 {attempt+1} 失敗: {e}")
-                err_lower = str(e).lower()
-                is_fatal_quota = "quota" in err_lower or "limit" in err_lower or "exhausted" in err_lower
-                
-                if attempt == retries - 1 or is_fatal_quota:
-                    raise e
-                # 遇到 429 或其他錯誤時，做漸進式指數退避等待
-                await asyncio.sleep(3 + attempt * 2)
-                
-        sec_questions = res_data.get("questions", [])
-        if not sec_questions and isinstance(res_data, list):
-            sec_questions = res_data
+
+        batch_counts = [sec_cnt]
+        if sec_cnt > 8 and should_split_section(sec):
+            batch_counts = split_count(sec_cnt)
+            logger.info(f"✂️ [Token 防護] {sec_name} 題數較多，拆成 {len(batch_counts)} 批生成：{batch_counts}")
+
+        sec_questions = []
+
+        for batch_idx, batch_cnt in enumerate(batch_counts, 1):
+            batch_suffix = "" if len(batch_counts) == 1 else f"（第 {batch_idx}/{len(batch_counts)} 批）"
+            system_prompt, user_prompt = build_exam_prompt_for_single_section(
+                subject_name=subject_name,
+                unit_codes=unit_codes,
+                sec_name=sec_name,
+                sec_cnt=batch_cnt,
+                sec_type=sec_type,
+                scoring=scoring,
+                difficulty=difficulty,
+                textbook_chunks=textbook_chunks,
+                past_exam_chunks=past_exam_chunks,
+                layout_type=sec.get("layout_type", ""),
+                custom_requirements=(
+                    f"{style_json.get('custom_requirements', '')}\n"
+                    f"本次只生成「{sec_name}」的 {batch_cnt} 題，且不可與同大題其他批次重複。"
+                ).strip()
+            )
+
+            # 嘗試呼叫 AI (含 429 緩退重試機制與 Semaphore 併發保護)
+            res_data = None
+            retries = 2 # 縮減為最多重試 2 次即可，內部已有多模型防護
+            for attempt in range(retries):
+                try:
+                    # 使用信號量限制併發
+                    async with sem:
+                        # 避免 API 重疊發送（若併發為 1 則小延遲，多併發隨機延遲）
+                        delay = 0.1 if max_concurrency == 1 else random.uniform(0.2, 0.8)
+                        await asyncio.sleep(delay)
+                        res_data = await generate_questions(
+                            system_prompt=system_prompt,
+                            user_prompt=user_prompt,
+                            target_count=batch_cnt,
+                            unit_codes=unit_codes
+                        )
+                    break
+                except TokenBudgetError as e:
+                    logger.warning(f"⚠️ 大題 [{sec_name}{batch_suffix}] token 不足: {e}")
+                    if batch_cnt <= 4:
+                        raise e
+                    smaller_counts = split_count(batch_cnt, batch_size=max(2, batch_cnt // 2))
+                    logger.info(f"✂️ [Token 防護] {sec_name}{batch_suffix} 再拆小批次：{smaller_counts}")
+                    nested_results = []
+                    for nested_cnt in smaller_counts:
+                        nested_sec = dict(sec)
+                        nested_sec["question_count"] = nested_cnt
+                        _, nested_questions = await generate_single_sec(sec_idx, nested_sec)
+                        nested_results.extend(nested_questions)
+                    sec_questions.extend(nested_results)
+                    res_data = {"questions": []}
+                    break
+                except Exception as e:
+                    logger.warning(f"⚠️ 大題 [{sec_name}{batch_suffix}] 嘗試 {attempt+1} 失敗: {e}")
+                    err_lower = str(e).lower()
+                    is_fatal_quota = "quota" in err_lower or "limit" in err_lower or "exhausted" in err_lower
+                    
+                    if attempt == retries - 1 or is_fatal_quota:
+                        raise e
+                    # 遇到 429 或其他錯誤時，做漸進式指數退避等待
+                    await asyncio.sleep(3 + attempt * 2)
+
+            batch_questions = res_data.get("questions", []) if res_data else []
+            if not batch_questions and isinstance(res_data, list):
+                batch_questions = res_data
+            sec_questions.extend(batch_questions)
             
         logger.info(f"🛬 [大題生成完畢] {sec_name} 獲得 {len(sec_questions)} 題。")
         return sec_name, sec_questions

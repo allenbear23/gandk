@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from app.models.question import ExamGenerateRequest, ExamResult, GenerationMode
 from app.db.supabase_client import get_supabase, get_subject_name, get_subject_style
 from app.utils.prompt_builder import build_exam_prompt
-from app.services.ai_generator import generate_questions
+from app.services.ai_generator import TokenBudgetError, generate_questions
 
 # 保持 rag_engine 隔離，直到 Word 確認成功
 router = APIRouter(prefix="/student/exam", tags=["Student - 考卷生成"])
@@ -108,6 +108,17 @@ async def generate_exam(req: ExamGenerateRequest):
             )
         else:
             return exam_result
+
+    except TokenBudgetError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "⚠️ 【題目內容過長】\n\n"
+                "這次命題需要的輸出超過模型可承受的 token 上限。系統已嘗試自動分批，"
+                "但仍然無法生成完整 JSON。\n\n"
+                f"技術細節：{e}"
+            )
+        )
 
     except Exception as e:
         error_msg = str(e)

@@ -5,6 +5,20 @@ from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_CONTEXT_CHAR_BUDGET = 9000
+
+
+def estimate_token_count(text: str) -> int:
+    """
+    Lightweight token estimate for Gemini prompt budgeting.
+    Chinese text usually consumes fewer characters per token than English, so
+    this intentionally errs a bit high to keep requests under context limits.
+    """
+    if not text:
+        return 0
+    return max(1, len(text) // 2)
+
+
 def scale_style_prompt(style_prompt_str: str, max_total_questions: int = 15) -> tuple[str, int]:
     """
     等比例縮放考古題大題題數，防止 AI 生成題目過多導致輸出截斷 (Token Overflow)
@@ -120,12 +134,27 @@ def build_exam_prompt(
 """
     return system_prompt, user_prompt
 
-def _format_chunks(chunks: List[dict], label: str) -> str:
+def _format_chunks(chunks: List[dict], label: str, max_chars: int = DEFAULT_CONTEXT_CHAR_BUDGET) -> str:
     if not chunks: return f"【{label}】\n（目前無資料）\n"
     content = f"【{label}】\n"
+    used_chars = len(content)
     for i, chunk in enumerate(chunks, 1):
         text = chunk.get("chunk_text", chunk.get("text", ""))
-        content += f"\n[片段 {i}]\n{text}\n"
+        if not text:
+            continue
+
+        remaining = max_chars - used_chars
+        if remaining <= 0:
+            content += "\n（素材已達本次命題 token 預算上限，後續片段省略）\n"
+            break
+
+        snippet = text[:remaining]
+        content += f"\n[片段 {i}]\n{snippet}\n"
+        used_chars += len(snippet)
+
+        if len(text) > len(snippet):
+            content += "\n（本片段過長，已截取前段重點）\n"
+            break
     return content
 
 def build_exam_prompt_for_single_section(
